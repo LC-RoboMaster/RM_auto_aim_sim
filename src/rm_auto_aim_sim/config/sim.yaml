@@ -4,8 +4,8 @@ rm_auto_aim_sim:
     scene_path: "../scenes/lab.xml"
     initial_mode: "manual"
     camera_enabled: true
-    camera_width: 640
-    camera_height: 480
+    camera_width: 1280
+    camera_height: 1024
     camera_fps: 120.0
     camera_fovy_deg: 60.0
     camera_msaa: 0
@@ -43,14 +43,14 @@ rm_auto_aim_sim:
     model_camera_name: "gimbal_camera"
     model_muzzle_site: "muzzle"
     frame_world: "world"
-    frame_base: "base_link"
+    frame_base: "odom"
     frame_yaw: "yaw_link"
     frame_pitch: "pitch_link"
     frame_camera: "camera_link"
     frame_camera_optical: "camera_optical_frame"
     frame_muzzle: "muzzle_link"
-    topic_image: "/camera/image_raw"
-    topic_camera_info: "/camera/camera_info"
+    topic_image: "/image_raw"
+    topic_camera_info: "/camera_info"
     topic_pitch_state: "/gimbal/pitch"
     topic_yaw_state: "/gimbal/yaw"
     topic_pitch_command: "/gimbal/target_pitch"
@@ -79,10 +79,10 @@ rm_auto_aim_sim:
     target_color: "red"
     lighting_brightness: 1.0
     # Rectified camera K in pixels. Set true to replace FOV with these values.
-    camera_use_intrinsics: false
-    camera_fx: 554.256258
-    camera_fy: 554.256258
-    camera_cx: 319.5
-    camera_cy: 239.5
+    camera_use_intrinsics: true
+    camera_fx: 1576.115395
+    camera_fy: 1566.175713
+    camera_cx: 656.289108
+    camera_cy: 510.515086
     # import_rmuc_field.py produces an RMUC config with an absolute field_xml.
     field_xml: ""
