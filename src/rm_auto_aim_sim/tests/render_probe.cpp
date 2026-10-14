@@ -140,3 +140,78 @@ extern "C" int RunLabRenderProbe(const char* config_path, const char* output_pat
     return 1;
   }
 }
+
+// RGB luminance and background checks target the detector's threshold input,
+// including a live style change on an existing independent camera context.
+extern "C" int RunDarkRenderProbe(const char* config_path, const char* output_path) {
+  namespace aim = rm_auto_aim_sim;
+  try {
+    auto config = aim::Config::Load(config_path);
+    config.projectile_pool_size = 8;
+    aim::Engine engine(config);
+    auto settings = engine.Target()->Settings();
+    settings.center = {-2, 0, 0};
+    settings.h1 = settings.h2 = .99;
+    settings.angle = 0;
+    settings.angular_speed = 0;
+    settings.color = 0;
+    engine.Target()->Configure(settings, engine.Data());
+    engine.SetBrightness(.03);
+    engine.Environment().SetAlbedo(0);
+    engine.Environment().SetDarkSky(true);
+    engine.Target()->SetLightWhiteness(.65);
+    std::unique_ptr<mjModel, decltype(&mj_deleteModel)> copy(mj_copyModel(nullptr, engine.Model()),
+                                                             mj_deleteModel);
+    std::unique_ptr<mjData, decltype(&mj_deleteData)> data(mj_makeData(copy.get()), mj_deleteData);
+    aim::CameraRenderer renderer(copy.get(), engine.CameraId(), config.camera_width,
+                                 config.camera_height);
+    aim::CameraFrame frame;
+    auto render = [&]() {
+      engine.CopyRenderSettings(copy.get());
+      mj_copyData(data.get(), copy.get(), engine.Data());
+      mj_forward(copy.get(), data.get());
+      frame.state = engine.State();
+      renderer.Render(data.get(), frame);
+    };
+    auto save = [&](const std::string& path) {
+      std::ofstream image(path, std::ios::binary);
+      image << "P6\n" << frame.width << ' ' << frame.height << "\n255\n";
+      image.write(reinterpret_cast<const char*>(frame.rgb.data()), frame.rgb.size());
+    };
+    auto check = [&](int dominant, int other) {
+      int white_lamps = 0;
+      for (std::size_t i = 0; i < frame.rgb.size(); i += 3) {
+        const double gray = .299 * frame.rgb[i] + .587 * frame.rgb[i + 1] + .114 * frame.rgb[i + 2];
+        if (gray > 150 && frame.rgb[i + dominant] > frame.rgb[i + other] + 60) ++white_lamps;
+      }
+      if (white_lamps < 5)
+        throw std::runtime_error("Lamp grayscale threshold/color difference failed");
+      // Corners in this view are sky (top) and floor (bottom), away from targets.
+      for (int row : {5, frame.height - 6})
+        for (int col : {5, frame.width - 6})
+          for (int ch = 0; ch < 3; ++ch)
+            if (frame.rgb[(row * frame.width + col) * 3 + ch] > 2)
+              throw std::runtime_error("Sky/floor is not black in sensor RGB");
+    };
+    render();
+    check(0, 2);
+    save(std::string(output_path) + ".red.ppm");
+    settings = engine.Target()->Settings();
+    settings.color = 1;
+    engine.Target()->Configure(settings, engine.Data());
+    render();
+    check(2, 0);
+    save(std::string(output_path) + ".blue.ppm");
+    // Restoring sky on the same GL context must restore source sky pixels.
+    engine.Environment().SetDarkSky(false);
+    render();
+    if (frame.rgb[5 * frame.width * 3 + 5 * 3 + 2] < 50)
+      throw std::runtime_error("Sky toggle cannot restore original sky");
+    std::cout
+        << "PASS: black RGB sky/floor, red/blue gray>150 and color gap>60, live sky restore.\n";
+    return 0;
+  } catch (const std::exception& error) {
+    std::cerr << "DARK RENDER FAIL: " << error.what() << '\n';
+    return 1;
+  }
+}

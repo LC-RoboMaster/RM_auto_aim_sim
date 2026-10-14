@@ -77,7 +77,7 @@ rm_auto_aim_sim:
     target_angular_speed: 0.0
     target_initial_angle: 0.0
     target_color: "red"
-    lighting_brightness: 1.0
+    lighting_brightness: 0.03
     # Rectified camera K in pixels. Set true to replace FOV with these values.
     camera_use_intrinsics: true
     camera_fx: 1576.115395
@@ -86,3 +86,8 @@ rm_auto_aim_sim:
     camera_cy: 510.515086
     # import_rmuc_field.py produces an RMUC config with an absolute field_xml.
     field_xml: ""
+
+    # Binary-image armor testing: black background and brighter grayscale LED colours.
+    dark_sky: true
+    environment_albedo: 0.0
+    target_light_whiteness: 0.65

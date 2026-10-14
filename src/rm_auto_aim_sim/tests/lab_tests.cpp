@@ -72,6 +72,20 @@ int main(int argc, char** argv) {
     engine.SetBrightness(0);
     Check(engine.Model()->vis.headlight.diffuse[0] == 0, "Headlight dimming failed");
     engine.SetBrightness(1);
+    const int floor = mj_name2id(engine.Model(), mjOBJ_GEOM, "floor");
+    if (floor >= 0) {
+      const int mask = engine.Model()->geom_contype[floor];
+      engine.Environment().SetAlbedo(0);
+      Check(
+          engine.Model()->geom_rgba[4 * floor] == 0 && engine.Model()->geom_contype[floor] == mask,
+          "Environment albedo changed physics or did not blacken floor");
+      engine.Environment().SetAlbedo(1);
+    }
+    engine.Target()->SetLightWhiteness(.65);
+    const auto* lamp = engine.Model()->mat_rgba + 4 * material;
+    Check(lamp[2] == 1 && lamp[0] > .6 && lamp[2] - lamp[0] > .3,
+          "Lamp whiteness lost blue contrast");
+    engine.Target()->SetLightWhiteness(0);
 
     // A real 17 mm sphere shot approaches the outward-facing plate 2 from -X.
     settings.center = {5, 0, 0};

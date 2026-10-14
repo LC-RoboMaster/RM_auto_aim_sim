@@ -85,3 +85,8 @@ AIM_PARAMETER(double, lighting_brightness, 1.0)
 AIM_PARAMETER(std::string, topic_hit_count, "/sim/armor_hit_count")
 AIM_PARAMETER(std::string, topic_hit_rate, "/sim/armor_hit_rate")
 AIM_PARAMETER(std::string, topic_statistics, "/sim/statistics")
+
+// Dark background / bright lamp controls for binary-image detector testing.
+AIM_PARAMETER(bool, dark_sky, false)
+AIM_PARAMETER(double, environment_albedo, 1.0)
+AIM_PARAMETER(double, target_light_whiteness, 0.0)

@@ -18,6 +18,7 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item);
 bool HandleViewerEvent(mujoco::Simulate* sim, mjuiState* state);
 void UpdateViewerInput(mujoco::Simulate* sim);
 void StepFromViewer();
+void ApplyViewerEnvironment(mujoco::Simulate* sim);
 void DrawViewerPlots(mujoco::Simulate* sim, mjrRect viewport);
 
 }  // namespace rm_auto_aim_sim

@@ -5,6 +5,7 @@
 #include <stdexcept>
 
 #include "rm_auto_aim_sim/camera_model.hpp"
+#include "rm_auto_aim_sim/environment.hpp"
 
 namespace rm_auto_aim_sim {
 CameraRenderer::CameraRenderer(const mjModel* model, int camera_id, int width, int height)
@@ -37,6 +38,7 @@ CameraRenderer::~CameraRenderer() {
 
 void CameraRenderer::Render(mjData* data, CameraFrame& frame) {
   mjv_updateScene(model_, data, &option_, nullptr, &camera_, mjCAT_ALL, &scene_);
+  SetBlackSky(&scene_, frame.state.dark_sky);
   mjr_setBuffer(mjFB_OFFSCREEN, &context_);
   const mjrRect viewport{0, 0, width_, height_};
   mjr_render(viewport, &scene_, &context_);

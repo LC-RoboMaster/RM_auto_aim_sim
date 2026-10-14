@@ -32,6 +32,7 @@ struct StateFrame {
   std::uint64_t shot_count = 0;
   std::uint64_t pool_exhausted_count = 0;
   int active_projectiles = 0;
+  bool dark_sky = false;
   std::uint64_t statistics_shots = 0, armor_hits = 0, statistics_epoch = 0;
   std::array<std::uint64_t, 4> plate_hits{};
   double hit_rate = 0;

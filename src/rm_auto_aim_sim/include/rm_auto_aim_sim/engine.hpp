@@ -8,6 +8,7 @@
 #include "rm_auto_aim_sim/config.hpp"
 #include "rm_auto_aim_sim/projectile_pool.hpp"
 #include "rm_auto_aim_sim/target.hpp"
+#include "rm_auto_aim_sim/environment.hpp"
 #include "rm_auto_aim_sim/types.hpp"
 
 namespace rm_auto_aim_sim {
@@ -56,6 +57,7 @@ class Engine {
   CameraIntrinsics Intrinsics() const;
   void SetBrightness(double brightness);
   double Brightness() const { return brightness_; }
+  EnvironmentAppearance& Environment() { return *environment_; }
   // Copy only UI-mutable render arrays, under the physics mutex, into a worker model.
   void CopyRenderSettings(mjModel* destination) const;
 
@@ -67,6 +69,7 @@ class Engine {
   mjData* data_ = nullptr;
   std::unique_ptr<ProjectilePool> pool_;
   std::unique_ptr<ArmorTarget> target_;
+  std::unique_ptr<EnvironmentAppearance> environment_;
   std::vector<float> original_diffuse_, original_ambient_, original_specular_;
   mjVisual original_visual_{};
   double brightness_ = 1;

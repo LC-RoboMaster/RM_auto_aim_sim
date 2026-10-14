@@ -141,3 +141,36 @@ Emission 是材质自亮，不是对附近物体的光照或 bloom。远处真�
 场景还添加云台 pitch/yaw 的 jointpos/jointvel 传感器，曲线绘制用统一状态快照。
 新增可调项统一写入 `config_fields.def`，参数命名用 snake_case，单位在此说明。
 UI 修改是当前会话值，不会自动覆写 YAML。
+
+## 6. 黑天空、黑场地与二值化灯条
+
+仅降低 Brightness 不会改变 skybox 的颜色。新增的暗环境控制同时作用于 viewer
+和 ROS RGB：
+
+```yaml
+lighting_brightness: 0.03     # 环境灯/headlight 的强度
+dark_sky: true
+environment_albedo: 0.0     # 0 = 场地完全黑；1 = 原始颜色
+target_light_whiteness: 0.65 # 0 = 原来的纯色灯条；1 = 白色、失去颜色区分
+```
+
+右侧 CAMERA / LIGHT 中的
+Brightness、Black sky、Scene albedo、Lamp whiteness 可实时调整。
+Scene albedo 缩放地板、墙、障碍和 RMUC 场地的视觉颜色及高光，不改变碰撞，
+也不改变装甲/子弹材质。Black sky 关闭天空盒及地平线亮雾，不需重传天空纹理。
+
+灯条 emission 已为 1，盲目设为大于 1 的值不等价于曝光提升。纯红和纯蓝即使
+单通道值为 255，转换灰度后仍可能偏暗。Lamp whiteness 将灯条向白色混合，模拟
+LED 饱和时的高亮颜色；0.65 的测试中红蓝灯条均通过灰度阈值 150，并保留大于
+60 的红蓝通道差。这不是曝光/光晕的物理模型，也不能保证你的整个检测器通过。
+
+若二值化阈值较高，可以逐步调到 0.75～0.8；偏白过多会减小颜色通道差，需要
+同时观察颜色筛选阈值。若灯条只有 1～2 像素宽，应先把目标拉到云台前方 2～3 m，
+再检查灯条面积、长宽比与配对间距条件，避免把几何筛选失败当成亮度问题。
+
+![暗环境红灯条 RGB](images/dark_red.png)
+![暗环境蓝灯条 RGB](images/dark_blue.png)
+
+回归测试改用 `tests/test_config.yaml` 固定场景和参数，避免实际相机分辨率、K、
+发射频率等运行设置改变物理测试假设。你的 `config/sim.yaml` 仍会在正常启动时
+完整检查；相机 K 必须与该配置的分辨率相匹配。

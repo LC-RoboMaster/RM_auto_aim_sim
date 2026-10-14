@@ -29,6 +29,7 @@ ArmorTarget::ArmorTarget(const Config& config, mjModel* model) : model_(model) {
   settings_.angular_speed = config.target_angular_speed;
   settings_.angle = config.target_initial_angle;
   settings_.color = config.target_color == "blue" ? 1 : 0;
+  settings_.light_whiteness = config.target_light_whiteness;
   initial_ = settings_;
 }
 
@@ -40,7 +41,9 @@ void ArmorTarget::Configure(const TargetSettings& value, mjData* data) {
       value.h1 < .08 || value.h2 < .08 || value.h1 > 5 || value.h2 > 5 ||
       !std::isfinite(value.angular_speed) || std::abs(value.angular_speed) > 30 ||
       !std::isfinite(value.angle) || !std::isfinite(value.tilt) ||
-      std::abs(value.tilt) > mjPI / 3 || value.color < 0 || value.color > 1)
+      std::abs(value.tilt) > mjPI / 3 || value.color < 0 || value.color > 1 ||
+      !std::isfinite(value.light_whiteness) || value.light_whiteness < 0 ||
+      value.light_whiteness > 1)
     throw std::runtime_error("Target settings out of range");
   settings_ = value;
   for (int i = 0; i < 4; ++i) {
@@ -55,11 +58,7 @@ void ArmorTarget::Configure(const TargetSettings& value, mjData* data) {
     const mjtNum tilt[4] = {std::cos(value.tilt / 2), 0, -std::sin(value.tilt / 2), 0};
     mju_mulQuat(model_->body_quat + 4 * bodies_[i], yaw, tilt);
   }
-  auto* rgba = model_->mat_rgba + 4 * material_;
-  rgba[0] = value.color == 0 ? 1 : .02f;
-  rgba[1] = value.color == 0 ? .03f : .12f;
-  rgba[2] = value.color == 0 ? .02f : 1;
-  rgba[3] = 1;
+  ApplyLampMaterial();
   // Update subtree inertia after editing fixed-body offsets; preserve live state.
   // mj_setConst also recomputes extent from parked projectile bodies. Keep the
   // authored scene bounds so those far-away slots cannot move the near clip plane.
@@ -68,6 +67,24 @@ void ArmorTarget::Configure(const TargetSettings& value, mjData* data) {
   model_->stat = statistics;
   Apply(data);
   mj_forward(model_, data);
+}
+
+void ArmorTarget::SetLightWhiteness(double whiteness) {
+  if (!std::isfinite(whiteness) || whiteness < 0 || whiteness > 1)
+    throw std::runtime_error("Lamp whiteness must be in [0,1]");
+  settings_.light_whiteness = whiteness;
+  ApplyLampMaterial();
+}
+
+void ArmorTarget::ApplyLampMaterial() {
+  const float color[3] = {settings_.color == 0 ? 1.f : .02f, settings_.color == 0 ? .03f : .12f,
+                          settings_.color == 0 ? .02f : 1.f};
+  auto* rgba = model_->mat_rgba + 4 * material_;
+  // Raising emission above one is not an exposure model. Blend toward white
+  // to simulate saturated LED colour and raise grayscale luminance explicitly.
+  for (int i = 0; i < 3; ++i) rgba[i] = color[i] + (1 - color[i]) * settings_.light_whiteness;
+  rgba[3] = 1;
+  model_->mat_emission[material_] = 1;
 }
 
 void ArmorTarget::Apply(mjData* data) const {

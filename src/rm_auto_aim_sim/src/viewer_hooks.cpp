@@ -19,7 +19,8 @@ int mode_ui = 0, view_ui = 0, direction_ui = 0, plots_ui = 1;
 int control_section = -1, target_section = -1, camera_section = -1, stats_section = -1;
 TargetSettings target_ui;
 CameraIntrinsics camera_ui{};
-double speed_ui = 0, brightness_ui = 1;
+double speed_ui = 0, brightness_ui = 1, albedo_ui = 1, lamp_white_ui = 0;
+int dark_sky_ui = 0;
 bool camera_was_fixed = false;
 mjvCamera saved_free_camera{};
 mjvFigure angles_figure{}, rate_figure{};
@@ -99,7 +100,7 @@ void Figure(mjvFigure& fig, const char* title, const char* label) {
   Color(fig.linergb[1], .95f, .65f, .28f);
 }
 void Error(mujoco::Simulate* sim, const char* message) {
-  auto& text = sim->ui1.sect[camera_section].item[5].multi;
+  auto& text = sim->ui1.sect[camera_section].item[8].multi;
   std::snprintf(text.name[0], mjMAXUINAME, "%s", message);
 }
 }  // namespace
@@ -117,6 +118,9 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   direction_ui = target_ui.angular_speed < 0 ? 1 : 0;
   camera_ui = engine->Intrinsics();
   brightness_ui = engine->Brightness();
+  albedo_ui = engine->Environment().Albedo();
+  dark_sky_ui = engine->Environment().DarkSky() ? 1 : 0;
+  lamp_white_ui = target_ui.light_whiteness;
   history.clear();
   last_sample = -1;
   epoch = engine->State().statistics_epoch;
@@ -154,6 +158,9 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_EDITNUM, "cx / cy [px]", 1, &camera_ui.cx, "2"},
       {mjITEM_BUTTON, "Apply intrinsics", 1},
       {mjITEM_SLIDERNUM, "Brightness", 1, &brightness_ui, "0 3"},
+      {mjITEM_CHECKINT, "Black sky", 1, &dark_sky_ui},
+      {mjITEM_SLIDERNUM, "Scene albedo", 1, &albedo_ui, "0 1"},
+      {mjITEM_SLIDERNUM, "Lamp whiteness", 1, &lamp_white_ui, "0 1"},
       {mjITEM_STATIC, "Camera model", 1, nullptr, "Rectified pinhole RGB\nK alters projection"},
       {mjITEM_STATIC, "Status", 1, nullptr, "Ready"},
       {mjITEM_SECTION, "HIT STATISTICS", 1},
@@ -189,6 +196,12 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
         Error(sim, "Intrinsics applied");
       }
       if (item->itemid == 3) engine->SetBrightness(brightness_ui);
+      if (item->itemid == 4) engine->Environment().SetDarkSky(dark_sky_ui != 0);
+      if (item->itemid == 5) engine->Environment().SetAlbedo(albedo_ui);
+      if (item->itemid == 6 && engine->Target()) {
+        engine->Target()->SetLightWhiteness(lamp_white_ui);
+        target_ui.light_whiteness = lamp_white_ui;
+      }
     } else if (item->sectionid == stats_section) {
       if (item->itemid == 3) engine->ResetStatistics();
     } else
@@ -280,6 +293,8 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
   if (state.time < last_sample || state.statistics_epoch != epoch) {
     if (state.time < last_sample && engine->Target()) {
       target_ui = engine->Target()->Settings();
+      lamp_white_ui = target_ui.light_whiteness;
+      mjui_update(camera_section, 6, &sim->ui1, &sim->uistate, &sim->platform_ui->mjr_context());
       speed_ui = std::abs(target_ui.angular_speed);
       direction_ui = target_ui.angular_speed < 0 ? 1 : 0;
       mjui_update(target_section, -1, &sim->ui1, &sim->uistate, &sim->platform_ui->mjr_context());
@@ -293,6 +308,10 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
     last_sample = state.time;
     if (history.size() > 300) history.pop_front();
   }
+}
+
+void ApplyViewerEnvironment(mujoco::Simulate* sim) {
+  if (engine) engine->Environment().ConfigureScene(&sim->scn);
 }
 
 void DrawViewerPlots(mujoco::Simulate* sim, mjrRect viewport) {

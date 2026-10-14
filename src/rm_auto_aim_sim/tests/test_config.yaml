@@ -1,0 +1,16 @@
+# Regression fixture; changing config/sim.yaml must not change test assumptions.
+rm_auto_aim_sim:
+  ros__parameters:
+    scene_path: "../scenes/lab.xml"
+    camera_width: 640
+    camera_height: 480
+    camera_use_intrinsics: false
+    initial_mode: "manual"
+    target_enabled: true
+    target_tilt_deg: 15.0
+    target_light_whiteness: 0.0
+    dark_sky: false
+    environment_albedo: 1.0
+    physics_timestep: 0.0005
+    projectile_speed: 22.0
+    fire_rate_hz: 15.0

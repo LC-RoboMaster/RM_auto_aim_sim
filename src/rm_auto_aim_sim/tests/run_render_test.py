@@ -3,13 +3,14 @@
 import argparse
 import ctypes
 import os
+from pathlib import Path
 
 os.environ.setdefault("MUJOCO_GL", "egl")
 import mujoco
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--library", required=True)
-parser.add_argument("--config", required=True)
+parser.add_argument("--config", default=str(Path(__file__).with_name("test_config.yaml")))
 parser.add_argument("--output", default="camera_test.ppm")
 args = parser.parse_args()
 context = mujoco.GLContext(640, 480)
@@ -22,5 +23,9 @@ if result == 0:
     library.RunLabRenderProbe.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     library.RunLabRenderProbe.restype = ctypes.c_int
     result = library.RunLabRenderProbe(os.fsencode(args.config), os.fsencode(args.output + ".lab.ppm"))
+if result == 0:
+    library.RunDarkRenderProbe.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    library.RunDarkRenderProbe.restype = ctypes.c_int
+    result = library.RunDarkRenderProbe(os.fsencode(args.config), os.fsencode(args.output + ".dark"))
 context.free()
 raise SystemExit(result)

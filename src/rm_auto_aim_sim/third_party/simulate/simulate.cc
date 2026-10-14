@@ -2612,6 +2612,7 @@ void Simulate::Render() {
   }
 
   // render scene
+  rm_auto_aim_sim::ApplyViewerEnvironment(this);
   mjr_render(rect, &this->scn, &this->platform_ui->mjr_context());
   rm_auto_aim_sim::DrawViewerPlots(this, rect);
 

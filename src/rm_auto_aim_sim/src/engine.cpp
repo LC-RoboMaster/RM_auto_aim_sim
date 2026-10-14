@@ -181,6 +181,9 @@ Engine::Engine(Config config) : config_(std::move(config)) {
     original_diffuse_.assign(model_->light_diffuse, model_->light_diffuse + 3 * model_->nlight);
     original_ambient_.assign(model_->light_ambient, model_->light_ambient + 3 * model_->nlight);
     original_specular_.assign(model_->light_specular, model_->light_specular + 3 * model_->nlight);
+    environment_ = std::make_unique<EnvironmentAppearance>(model_);
+    environment_->SetAlbedo(config_.environment_albedo);
+    environment_->SetDarkSky(config_.dark_sky);
     original_visual_ = model_->vis;
     SetBrightness(config_.lighting_brightness);
     mode_ = config_.initial_mode == "auto" ? ControlMode::kAuto : ControlMode::kManual;
@@ -312,6 +315,11 @@ void Engine::CopyRenderSettings(mjModel* destination) const {
   std::copy(model_->body_pos, model_->body_pos + 3 * model_->nbody, destination->body_pos);
   std::copy(model_->body_quat, model_->body_quat + 4 * model_->nbody, destination->body_quat);
   std::copy(model_->mat_rgba, model_->mat_rgba + 4 * model_->nmat, destination->mat_rgba);
+  std::copy(model_->geom_rgba, model_->geom_rgba + 4 * model_->ngeom, destination->geom_rgba);
+  std::copy(model_->mat_specular, model_->mat_specular + model_->nmat, destination->mat_specular);
+  std::copy(model_->mat_reflectance, model_->mat_reflectance + model_->nmat,
+            destination->mat_reflectance);
+  std::copy(model_->mat_emission, model_->mat_emission + model_->nmat, destination->mat_emission);
   std::copy(model_->light_diffuse, model_->light_diffuse + 3 * model_->nlight,
             destination->light_diffuse);
   std::copy(model_->light_ambient, model_->light_ambient + 3 * model_->nlight,
@@ -342,6 +350,7 @@ StateFrame Engine::State(const mjData* source) const {
   frame.shot_count = pool_->ShotCount();
   frame.pool_exhausted_count = pool_->ExhaustedCount();
   frame.active_projectiles = pool_->ActiveCount();
+  frame.dark_sky = environment_->DarkSky();
   frame.statistics_shots = pool_->StatisticsShots();
   frame.armor_hits = pool_->ArmorHits();
   frame.plate_hits = pool_->PlateHits();

@@ -194,7 +194,7 @@ bash run_standalone.sh
 ```bash
 MUJOCO_GL=egl python src/rm_auto_aim_sim/tests/run_render_test.py \
   --library build/standalone/libaim_render_probe.so \
-  --config src/rm_auto_aim_sim/config/sim.yaml --output /tmp/camera_test.ppm
+  --config src/rm_auto_aim_sim/tests/test_config.yaml --output /tmp/camera_test.ppm
 ```
 
 当前交付验证范围见 [TEST_RESULTS.md](TEST_RESULTS.md)。ROS2/你的 RTX 4060 实测帧率需要在 Ubuntu 22.04 目标机运行检查脚本。

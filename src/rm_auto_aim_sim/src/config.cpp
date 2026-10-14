@@ -94,6 +94,11 @@ void Config::Validate() const {
               std::abs(target_angular_speed) <= 30 && std::isfinite(target_initial_angle) &&
               std::isfinite(target_tilt_deg) && std::abs(target_tilt_deg) <= 60,
           "Target parameters invalid");
+  require(std::isfinite(environment_albedo) && environment_albedo >= 0 && environment_albedo <= 1,
+          "environment_albedo must be in [0,1]");
+  require(std::isfinite(target_light_whiteness) && target_light_whiteness >= 0 &&
+              target_light_whiteness <= 1,
+          "target_light_whiteness must be in [0,1]");
   std::set<std::string> frames;
   for (const auto& frame : {frame_world, frame_base, frame_yaw, frame_pitch, frame_camera,
                             frame_camera_optical, frame_muzzle}) {
