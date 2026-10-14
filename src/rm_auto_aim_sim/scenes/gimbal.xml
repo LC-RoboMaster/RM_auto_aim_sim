@@ -1,0 +1,22 @@
+<mujoco>
+  <body name="base_link" mocap="true" pos="-5 0 0.65">
+    <!-- Visual geoms are non-colliding; the base is a user-positioned test fixture. -->
+    <geom type="box" size="0.22 0.20 0.08" rgba="0.2 0.24 0.30 1" contype="0" conaffinity="0"/>
+    <body name="yaw_link" pos="0 0 0.12" gravcomp="1">
+      <joint name="yaw_joint" type="hinge" axis="0 0 1" limited="true" range="-3.141593 3.141593" damping="0.1"/>
+      <geom type="cylinder" size="0.12 0.09" mass="1.0" rgba="0.32 0.4 0.48 1" contype="0" conaffinity="0"/>
+      <body name="pitch_link" pos="0 0 0.14" gravcomp="1">
+        <!-- Rotation about -Y makes positive pitch point the barrel upward. -->
+        <joint name="pitch_joint" type="hinge" axis="0 -1 0" limited="true" range="-0.523599 0.785398" damping="0.1"/>
+        <geom type="box" size="0.18 0.10 0.055" mass="0.8" rgba="0.25 0.32 0.4 1" contype="0" conaffinity="0"/>
+        <geom type="cylinder" fromto="0.12 0 0 0.45 0 0" size="0.014" mass="0.2" rgba="0.16 0.17 0.18 1" contype="0" conaffinity="0"/>
+        <site name="muzzle" pos="0.48 0 0" size="0.006" rgba="0 1 0 0.3"/>
+        <body name="camera_link" pos="0.14 0 0.08">
+          <geom type="box" size="0.035 0.025 0.025" rgba="0.05 0.06 0.07 1" contype="0" conaffinity="0"/>
+          <!-- MuJoCo camera: right = -Y; up = +Z; looks along local -Z = body +X. -->
+          <camera name="gimbal_camera" pos="0.04 0 0" xyaxes="0 -1 0 0 0 1" fovy="60" ipd="0"/>
+        </body>
+      </body>
+    </body>
+  </body>
+</mujoco>

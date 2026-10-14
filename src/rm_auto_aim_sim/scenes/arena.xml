@@ -1,0 +1,45 @@
+<mujoco model="RM Auto Aim Visual Simulator">
+  <compiler angle="radian" autolimits="true"/>
+  <option timestep="0.0005" gravity="0 0 -9.81" integrator="implicitfast" solver="Newton" iterations="15"/>
+  <size memory="64M"/>
+  <statistic center="0 0 1" extent="25"/>
+  <visual>
+    <global azimuth="135" elevation="-25"/>
+    <map znear="0.002" zfar="4"/>
+    <quality shadowsize="1024" offsamples="0"/>
+    <headlight ambient="0.5 0.5 0.5" diffuse="0.7 0.7 0.7" specular="0.1 0.1 0.1"/>
+  </visual>
+  <default>
+    <!-- Scene collision bit 1 only pairs with projectile bit 2. -->
+    <geom contype="1" conaffinity="2" friction="0.6 0.005 0.0001"/>
+  </default>
+  <asset>
+    <texture name="sky" type="skybox" builtin="gradient" width="512" height="3072" rgb1="0.55 0.70 0.88" rgb2="0.93 0.96 1"/>
+    <texture name="floor_texture" type="2d" builtin="checker" width="512" height="512" rgb1="0.75 0.77 0.8" rgb2="0.6 0.63 0.67"/>
+    <material name="floor_material" texture="floor_texture" texrepeat="16 12" reflectance="0.05"/>
+    <material name="red_light" rgba="1 0.05 0.03 1" emission="1"/>
+    <material name="blue_light" rgba="0.02 0.12 1 1" emission="1"/>
+  </asset>
+  <worldbody>
+    <light pos="0 0 8" dir="0 0 -1" directional="true" diffuse="0.8 0.8 0.8" castshadow="false"/>
+    <geom name="floor" type="plane" size="15 12 0.1" material="floor_material"/>
+    <geom name="back_wall" type="box" pos="13 0 1.5" size="0.1 10 1.5" rgba="0.85 0.87 0.9 1"/>
+    <geom name="left_wall" type="box" pos="0 10 1.5" size="13 0.1 1.5" rgba="0.8 0.84 0.89 1"/>
+    <geom name="right_wall" type="box" pos="0 -10 1.5" size="13 0.1 1.5" rgba="0.9 0.85 0.8 1"/>
+    <geom name="cover_1" type="box" pos="3 3 0.5" size="0.8 0.6 0.5" rgba="0.4 0.5 0.6 1"/>
+    <geom name="cover_2" type="box" pos="5 -3 0.8" size="0.6 0.6 0.8" rgba="0.5 0.6 0.4 1"/>
+    <geom name="pillar" type="cylinder" pos="8 5 1.0" size="0.3 1.0" rgba="0.65 0.5 0.4 1"/>
+    <!-- Simple static visual targets; rotational armor motion can be added in targets.xml. -->
+    <body name="red_target" pos="5 0 1.0">
+      <geom name="red_target_plate" type="box" size="0.025 0.18 0.12" rgba="0.08 0.08 0.08 1"/>
+      <geom name="red_bar_left" type="box" pos="-0.031 0.12 0" size="0.005 0.015 0.07" material="red_light"/>
+      <geom name="red_bar_right" type="box" pos="-0.031 -0.12 0" size="0.005 0.015 0.07" material="red_light"/>
+    </body>
+    <body name="blue_target" pos="7 -2 1.1">
+      <geom name="blue_target_plate" type="box" size="0.025 0.18 0.12" rgba="0.08 0.08 0.08 1"/>
+      <geom name="blue_bar_left" type="box" pos="-0.031 0.12 0" size="0.005 0.015 0.07" material="blue_light"/>
+      <geom name="blue_bar_right" type="box" pos="-0.031 -0.12 0" size="0.005 0.015 0.07" material="blue_light"/>
+    </body>
+    <include file="gimbal.xml"/>
+  </worldbody>
+</mujoco>
