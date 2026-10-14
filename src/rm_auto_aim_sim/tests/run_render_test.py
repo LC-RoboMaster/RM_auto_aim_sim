@@ -18,5 +18,9 @@ library = ctypes.CDLL(os.path.abspath(args.library))
 library.RunRenderProbe.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
 library.RunRenderProbe.restype = ctypes.c_int
 result = library.RunRenderProbe(os.fsencode(args.config), os.fsencode(args.output))
+if result == 0:
+    library.RunLabRenderProbe.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    library.RunLabRenderProbe.restype = ctypes.c_int
+    result = library.RunLabRenderProbe(os.fsencode(args.config), os.fsencode(args.output + ".lab.ppm"))
 context.free()
 raise SystemExit(result)

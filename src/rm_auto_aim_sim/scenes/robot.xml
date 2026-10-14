@@ -1,0 +1,28 @@
+<mujoco model="RM Auto Aim Visual Simulator">
+  <compiler angle="radian" autolimits="true" />
+  <option timestep="0.0005" gravity="0 0 -9.81" integrator="implicitfast" solver="Newton" iterations="15" />
+  <size memory="64M" />
+  <statistic center="0 0 1" extent="25" />
+  <visual>
+    <global azimuth="135" elevation="-25" />
+    <map znear="0.002" zfar="4" />
+    <quality shadowsize="1024" offsamples="0" />
+    <headlight ambient="0.5 0.5 0.5" diffuse="0.7 0.7 0.7" specular="0.1 0.1 0.1" />
+  </visual>
+  <default>
+    <geom contype="1" conaffinity="2" friction="0.6 0.005 0.0001" />
+  </default>
+  <asset>
+    </asset>
+  <worldbody>
+    <include file="gimbal.xml" />
+  </worldbody>
+  <include file="armor_assets.xml" />
+  <include file="targets.xml" />
+  <sensor>
+    <jointpos name="gimbal_yaw_angle" joint="yaw_joint"/>
+    <jointpos name="gimbal_pitch_angle" joint="pitch_joint"/>
+    <jointvel name="gimbal_yaw_rate" joint="yaw_joint"/>
+    <jointvel name="gimbal_pitch_rate" joint="pitch_joint"/>
+  </sensor>
+</mujoco>

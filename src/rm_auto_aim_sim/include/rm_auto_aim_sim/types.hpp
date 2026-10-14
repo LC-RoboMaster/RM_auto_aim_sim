@@ -17,6 +17,8 @@ struct Pose {
 struct HitEvent {
   std::uint64_t shot_id = 0;
   double time = 0;
+  bool armor_hit = false;
+  int armor_index = -1;
   std::string geom_name;
   std::array<double, 3> position{};
 };
@@ -30,6 +32,9 @@ struct StateFrame {
   std::uint64_t shot_count = 0;
   std::uint64_t pool_exhausted_count = 0;
   int active_projectiles = 0;
+  std::uint64_t statistics_shots = 0, armor_hits = 0, statistics_epoch = 0;
+  std::array<std::uint64_t, 4> plate_hits{};
+  double hit_rate = 0;
   ControlMode mode = ControlMode::kManual;
   Pose base, yaw_link, pitch_link, camera_link, optical, muzzle;
 };
@@ -38,7 +43,8 @@ struct CameraFrame {
   StateFrame state;
   int width = 0;
   int height = 0;
-  double focal_length = 0;
+  double focal_length = 0;  // Compatibility alias for fx.
+  double fx = 0, fy = 0, cx = 0, cy = 0;
   double wall_fps = 0;
   std::vector<std::uint8_t> rgb;
 };

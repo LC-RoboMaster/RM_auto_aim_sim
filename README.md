@@ -1,3 +1,17 @@
+# RM Auto Aim MuJoCo Simulator
+
+## v0.2：RMUC 场地、旋转装甲目标与测试面板
+
+新增四板靶标（r1/r2、h1/h2、XYZ、15° 上倾、红蓝切换、可调正反转）、
+命中统计和曲线、深色简洁 UI、自定义 fx/fy/cx/cy 与环境亮度。
+
+**[新功能完整使用说明](src/rm_auto_aim_sim/docs/ARMOR_LAB.md)**。
+默认配置启动带用户装甲模型的轻量调试场地；实际 RMUC 场地由上游场地包导入，
+使用导入脚本生成的 `sim_rmuc.yaml` 启动。未随仓库分发官方派生场地资产。
+
+旧版指南仍可参考，下列旧静态红蓝靶标只保留在 `scenes/arena.xml` 回归场景中。
+新的默认场景是 `scenes/lab.xml`，参数和界面变更以上方 v0.2 指南为准。
+
 # RoboMaster 自瞄视觉仿真器（MuJoCo + ROS2 Humble）
 
 这是一个独立的 C++17 工程，参考 [RM_Dron_mujoco_sim](https://github.com/Spaaaace-yyj/RM_Dron_mujoco_sim) 的官方 viewer 集成方式，面向 Ubuntu 22.04、Conda/pip MuJoCo 3.3.7、ROS2 Humble。第一版提供二轴云台、手动/自动模式、RGB 相机、完整 TF 和物理弹丸。后续可以在场景中加入旋转装甲板。

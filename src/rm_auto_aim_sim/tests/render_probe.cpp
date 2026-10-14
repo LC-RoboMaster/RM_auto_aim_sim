@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cmath>
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 
@@ -10,6 +11,14 @@
 extern "C" int RunRenderProbe(const char* config_path, const char* output_path) {
   try {
     auto config = rm_auto_aim_sim::Config::Load(config_path);
+    config.scene_path =
+        (std::filesystem::path(config.scene_path).parent_path() / "arena.xml").string();
+    config.target_enabled = false;
+    config.camera_use_intrinsics = true;
+    config.camera_fx = 800;
+    config.camera_fy = 910;
+    config.camera_cx = 301;
+    config.camera_cy = 218;
     rm_auto_aim_sim::Engine engine(config);
     rm_auto_aim_sim::CameraRenderer renderer(engine.Model(), engine.CameraId(), config.camera_width,
                                              config.camera_height);
@@ -40,8 +49,8 @@ extern "C" int RunRenderProbe(const char* config_path, const char* output_path) 
     mju_sub3(difference, engine.Data()->xpos + 3 * target, optical.position.data());
     mju_negQuat(inverse, optical.quaternion.data());
     mju_rotVecQuat(point, difference, inverse);
-    const double expected_x = (frame.width - 1) * 0.5 + frame.focal_length * point[0] / point[2];
-    const double expected_y = (frame.height - 1) * 0.5 + frame.focal_length * point[1] / point[2];
+    const double expected_x = frame.cx + frame.fx * point[0] / point[2];
+    const double expected_y = frame.cy + frame.fy * point[1] / point[2];
     if (std::abs(blue_x / blue_pixels - expected_x) > 2.0 ||
         std::abs(blue_y / blue_pixels - expected_y) > 2.0) {
       throw std::runtime_error("Rendered projection disagrees with CameraInfo/optical frame");
@@ -68,6 +77,66 @@ extern "C" int RunRenderProbe(const char* config_path, const char* output_path) 
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "RENDER FAIL: " << error.what() << '\n';
+    return 1;
+  }
+}
+
+// Check the imported user mesh lamps with zero environmental lighting, then
+// switch colour and pose; the real render must observe all UI-mutable arrays.
+extern "C" int RunLabRenderProbe(const char* config_path, const char* output_path) {
+  try {
+    auto config = rm_auto_aim_sim::Config::Load(config_path);
+    config.projectile_pool_size = 8;
+    rm_auto_aim_sim::Engine engine(config);
+    auto settings = engine.Target()->Settings();
+    settings.center = {-2, 0, 0};
+    settings.h1 = settings.h2 = .99;
+    settings.color = 0;
+    engine.Target()->Configure(settings, engine.Data());
+    engine.SetBrightness(0);
+    rm_auto_aim_sim::CameraRenderer renderer(engine.Model(), engine.CameraId(), 640, 480);
+    rm_auto_aim_sim::CameraFrame frame;
+    auto pixels = [&]() {
+      int red = 0, blue = 0;
+      for (std::size_t i = 0; i < frame.rgb.size(); i += 3) {
+        if (frame.rgb[i] > 180 && frame.rgb[i + 1] < 100 && frame.rgb[i + 2] < 100) ++red;
+        if (frame.rgb[i + 2] > 180 && frame.rgb[i] < 100 && frame.rgb[i + 1] < 100) ++blue;
+      }
+      return std::make_pair(red, blue);
+    };
+    renderer.Render(engine.Data(), frame);
+    if (pixels().first < 5) throw std::runtime_error("Red emissive mesh bars not visible");
+    settings.color = 1;
+    engine.Target()->Configure(settings, engine.Data());
+    renderer.Render(engine.Data(), frame);
+    if (pixels().second < 5 || pixels().first)
+      throw std::runtime_error("Blue lamp switch not rendered");
+    // Snapshot model must see colour, radius, lighting and calibration edits.
+    mjModel* copy = mj_copyModel(nullptr, engine.Model());
+    mjData* data = mj_makeData(copy);
+    settings.color = 0;
+    settings.r1 = .9;
+    engine.Target()->Configure(settings, engine.Data());
+    engine.SetIntrinsics({700, 850, 300, 220});
+    engine.SetBrightness(.4);
+    engine.CopyRenderSettings(copy);
+    mj_copyData(data, copy, engine.Data());
+    mj_forward(copy, data);
+    {
+      rm_auto_aim_sim::CameraRenderer worker(copy, engine.CameraId(), 640, 480);
+      worker.Render(data, frame);
+      if (pixels().first < 5 || std::abs(frame.fy - 850) > 1e-4 || std::abs(frame.cx - 300) > 1e-4)
+        throw std::runtime_error("Worker snapshot did not observe UI edits");
+    }
+    mj_deleteData(data);
+    mj_deleteModel(copy);
+    std::ofstream image(output_path, std::ios::binary);
+    image << "P6\n640 480\n255\n";
+    image.write(reinterpret_cast<const char*>(frame.rgb.data()), frame.rgb.size());
+    std::cout << "PASS: imported red/blue emission, radius edit, camera/light snapshot sync.\n";
+    return 0;
+  } catch (const std::exception& e) {
+    std::cerr << "LAB RENDER FAIL: " << e.what() << '\n';
     return 1;
   }
 }

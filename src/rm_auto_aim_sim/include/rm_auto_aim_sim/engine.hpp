@@ -4,8 +4,10 @@
 #include <memory>
 #include <mutex>
 
+#include "rm_auto_aim_sim/camera_model.hpp"
 #include "rm_auto_aim_sim/config.hpp"
 #include "rm_auto_aim_sim/projectile_pool.hpp"
+#include "rm_auto_aim_sim/target.hpp"
 #include "rm_auto_aim_sim/types.hpp"
 
 namespace rm_auto_aim_sim {
@@ -48,6 +50,14 @@ class Engine {
   mjModel* Model() const { return model_; }
   mjData* Data() const { return data_; }
   int CameraId() const { return camera_id_; }
+  ArmorTarget* Target() { return target_.get(); }
+  void ResetStatistics() { pool_->ResetStatistics(); }
+  void SetIntrinsics(const CameraIntrinsics& k);
+  CameraIntrinsics Intrinsics() const;
+  void SetBrightness(double brightness);
+  double Brightness() const { return brightness_; }
+  // Copy only UI-mutable render arrays, under the physics mutex, into a worker model.
+  void CopyRenderSettings(mjModel* destination) const;
 
  private:
   void ApplyGimbalPose();
@@ -56,6 +66,10 @@ class Engine {
   mjModel* model_ = nullptr;
   mjData* data_ = nullptr;
   std::unique_ptr<ProjectilePool> pool_;
+  std::unique_ptr<ArmorTarget> target_;
+  std::vector<float> original_diffuse_, original_ambient_, original_specular_;
+  mjVisual original_visual_{};
+  double brightness_ = 1;
   CommandMailbox mailbox_;
   ControlMode mode_ = ControlMode::kManual;
   ManualInput manual_input_;

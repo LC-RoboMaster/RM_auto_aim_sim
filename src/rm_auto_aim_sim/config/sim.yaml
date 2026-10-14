@@ -1,7 +1,7 @@
 # All units: metres, seconds, radians (except camera_fovy_deg).
 rm_auto_aim_sim:
   ros__parameters:
-    scene_path: "../scenes/arena.xml"
+    scene_path: "../scenes/lab.xml"
     initial_mode: "manual"
     camera_enabled: true
     camera_width: 640
@@ -63,3 +63,26 @@ rm_auto_aim_sim:
     topic_shot_count: "/sim/shot_count"
     topic_hit_event: "/sim/projectile_hit"
     topic_camera_fps: "/sim/camera_fps"
+
+    # Four-board target: metres, plate centre heights; rotation in signed rad/s.
+    target_enabled: true
+    target_x: 5.0
+    target_y: 0.0
+    target_z: 0.0
+    target_r1: 0.6
+    target_r2: 0.6
+    target_h1: 0.8
+    target_h2: 0.8
+    target_tilt_deg: 15.0
+    target_angular_speed: 0.0
+    target_initial_angle: 0.0
+    target_color: "red"
+    lighting_brightness: 1.0
+    # Rectified camera K in pixels. Set true to replace FOV with these values.
+    camera_use_intrinsics: false
+    camera_fx: 554.256258
+    camera_fy: 554.256258
+    camera_cx: 319.5
+    camera_cy: 239.5
+    # import_rmuc_field.py produces an RMUC config with an absolute field_xml.
+    field_xml: ""

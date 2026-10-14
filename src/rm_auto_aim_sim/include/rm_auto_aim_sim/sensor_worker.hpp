@@ -14,7 +14,7 @@ namespace rm_auto_aim_sim {
 // moves to the worker. A model copy isolates rendering from viewer model edits.
 class SensorWorker {
  public:
-  using Snapshot = std::function<StateFrame(mjData*)>;
+  using Snapshot = std::function<StateFrame(mjModel*, mjData*)>;
   using Publish = std::function<void(const CameraFrame&)>;
   SensorWorker(const Engine& engine, Snapshot snapshot, Publish publish);
   ~SensorWorker();
