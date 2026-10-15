@@ -26,7 +26,7 @@ rm_auto_aim_sim:
     base_z_min: 0.2
     base_z_max: 3.0
     fire_rate_hz: 15.0
-    projectile_speed: 22.0
+    projectile_speed: 25.0
     projectile_diameter: 0.017
     projectile_mass: 0.0032
     projectile_pool_size: 128
@@ -76,8 +76,8 @@ rm_auto_aim_sim:
     target_tilt_deg: 15.0
     target_angular_speed: 0.0
     target_initial_angle: 0.0
-    target_color: "red"
-    lighting_brightness: 0.03
+    target_color: "blue"
+    lighting_brightness: 0.135
     # Rectified camera K in pixels. Set true to replace FOV with these values.
     camera_use_intrinsics: true
     camera_fx: 1576.115395
@@ -89,5 +89,5 @@ rm_auto_aim_sim:
 
     # Binary-image armor testing: black background and brighter grayscale LED colours.
     dark_sky: true
-    environment_albedo: 0.0
-    target_light_whiteness: 0.65
+    environment_albedo: 1.0
+    target_light_whiteness: 0.45
