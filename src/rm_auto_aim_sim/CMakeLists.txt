@@ -94,7 +94,7 @@ if(BUILD_TESTING)
   target_link_libraries(aim_lab_tests PRIVATE aim_core)
   add_test(NAME armor_target_statistics COMMAND aim_lab_tests
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.yaml")
-  add_library(aim_render_probe SHARED tests/render_probe.cpp)
+  add_library(aim_render_probe SHARED tests/render_probe.cpp tests/async_render_probe.cpp)
   target_link_libraries(aim_render_probe PRIVATE aim_camera)
 endif()
 if(ENABLE_ROS2)

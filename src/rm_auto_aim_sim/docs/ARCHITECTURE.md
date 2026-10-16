@@ -13,8 +13,8 @@
 | `Engine` | 模型编译、对象名称绑定、手动平移、角度伺服、统一物理步进 |
 | `CommandMailbox` | 线程安全的最新命令缓存；控制模式隔离、有限值过滤和可选超时 |
 | `ProjectilePool` | 固定槽位复用、发射初始化、首次接触事件、寿命管理 |
-| `CameraRenderer` | 独立 MuJoCo 场景/FBO、RGB 读回、逐行上下翻转、针孔内参 |
-| `SensorWorker` | 隐藏 GLFW 上下文、模型/数据快照、采集调度、实际 FPS |
+| `CameraRenderer` | 独立 MuJoCo 场景/FBO、HDR Shader、GPU 翻转、三槽异步 PBO、针孔内参 |
+| `SensorWorker` | 隐藏 GLFW 上下文、模型/数据快照、采集/收帧调度、FPS 与进程负载 |
 | `RosBridge` | ROS2 参数、DDS pub/sub、仿真时钟、TF 和消息编码 |
 | `viewer_hooks` | 官方菜单扩展、键盘/鼠标控制、第一人称操作 |
 | `main.cpp` | 模块生命周期、viewer 主线程、物理线程与快照锁 |
@@ -24,6 +24,12 @@
 主线程持有 viewer 窗口并运行官方 `RenderLoop`。物理线程在同一个 `Simulate::mtx` 下修改 `Engine` 的 mjModel/mjData；菜单和鼠标回调也在该锁下运行。ROS executor 只操作 `CommandMailbox`，从不直接操作 MuJoCo 数据。
 
 相机线程有自己的一份 mjModel/mjData。每次采样只在短锁内执行 `mj_copyData` 并取得状态时间，然后在锁外渲染和发布。viewer 修改物理选项不改变相机线程自己的模型；相机尺寸/视场角属于启动配置。窗口创建/销毁在主线程，OpenGL 上下文在相机线程使用，FBO 也在该线程释放。
+
+异步采集与收帧分开：新仿真时刻调用 `RenderAsync`，暂停期间调用
+`CollectReady` 收取已有 GPU 作业，不产生重复图像。每槽保留自己的时间戳与 K。
+新采集时间小于上次采集时间时，在收取任何旧结果前清空待发布队列；删除 fence
+不等待 GPU，PBO 的后续写入仍由同一个 GL 上下文排序。性能统计按墙钟更新，
+不依赖仿真时间前进。同步 `Render` 保留用于基准成像检查。
 
 状态消息在物理锁内形成快照，DDS 发布在锁外进行。ROS executor 在线程退出后销毁，早于命令缓存销毁。相机线程退出后才销毁其窗口、数据与模型。
 

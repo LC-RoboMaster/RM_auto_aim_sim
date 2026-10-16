@@ -23,8 +23,8 @@ double Ms(Clock::time_point start, Clock::time_point end) {
 void CheckGl(const char* stage) {
   const GLenum error = glGetError();
   if (error != GL_NO_ERROR)
-    throw std::runtime_error(std::string("Camera OpenGL error after ") + stage +
-                             ": " + std::to_string(static_cast<unsigned>(error)));
+    throw std::runtime_error(std::string("Camera OpenGL error after ") + stage + ": " +
+                             std::to_string(static_cast<unsigned>(error)));
 }
 }  // namespace
 
@@ -40,6 +40,7 @@ struct CameraRenderer::Async {
   std::array<Slot, 3> slots;
   std::size_t read = 0, write = 0;
   std::size_t bytes;
+  double last_capture_time = -1;
   Async(int width, int height, const mjrContext& context)
       : pipeline(width, height, context), bytes(static_cast<std::size_t>(width) * height * 3) {
     for (auto& slot : slots) {
@@ -58,6 +59,18 @@ struct CameraRenderer::Async {
       glDeleteQueries(1, &slot.transfer_timer);
       glDeleteBuffers(1, &slot.pbo);
     }
+  }
+  void DiscardPending(CameraMetrics& metrics) {
+    for (auto& slot : slots) {
+      if (!slot.fence) continue;
+      // Deleting a fence does not wait or cancel queued GL work. Reuse is safe:
+      // subsequent writes to these PBOs are ordered in this same GL context.
+      glDeleteSync(slot.fence);
+      slot.fence = nullptr;
+      slot.frame = {};
+      ++metrics.dropped_frames;
+    }
+    read = write = 0;
   }
   bool Collect(CameraFrame& ready, CameraMetrics& metrics) {
     auto& slot = slots[read];
@@ -139,11 +152,16 @@ void CameraRenderer::Render(mjData* data, CameraFrame& frame) {
   }
 }
 
-bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame& ready,
-                                 bool shader, bool shadows, double exposure, double bloom,
-                                 double lamp_intensity, CameraMetrics& metrics) {
+bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame& ready, bool shader,
+                                 bool shadows, double exposure, double bloom, double lamp_intensity,
+                                 CameraMetrics& metrics) {
   if (!async_) async_ = std::make_unique<Async>(width_, height_, context_);
-  while (glGetError() != GL_NO_ERROR) {}  // Isolate this frame's GL errors.
+  while (glGetError() != GL_NO_ERROR) {
+  }  // Isolate this frame's GL errors.
+  // Drop the previous simulation's images before polling a ready PBO. Otherwise
+  // a reset/rewind can publish an old timestamp after /clock has jumped back.
+  if (capture.state.time < async_->last_capture_time) async_->DiscardPending(metrics);
+  async_->last_capture_time = capture.state.time;
   bool completed = async_->Collect(ready, metrics);
   auto& slot = async_->slots[async_->write];
   if (slot.fence) {
@@ -164,13 +182,13 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   mjr_render({0, 0, width_, height_}, &scene_, &context_);
   CheckGl("MuJoCo render");
   const auto k = ModelIntrinsics(model_, camera_id_, width_, height_);
-  async_->pipeline.Process(scene_, context_, k.fx, k.fy, k.cx, k.cy,
-                           exposure, bloom, lamp_intensity, shader);
+  async_->pipeline.Process(scene_, context_, k.fx, k.fy, k.cx, k.cy, exposure, bloom,
+                           lamp_intensity, shader);
   glEndQuery(GL_TIME_ELAPSED);
   CheckGl("HDR pipeline");
   metrics.render_ms = Ms(render_begin, Clock::now());
-  metrics.gpu_estimate_mib = async_->pipeline.EstimatedMiB() +
-                              3.0 * async_->bytes / (1024.0 * 1024.0);
+  metrics.gpu_estimate_mib =
+      async_->pipeline.EstimatedMiB() + 3.0 * async_->bytes / (1024.0 * 1024.0);
   capture.width = width_;
   capture.height = height_;
   capture.fx = capture.focal_length = k.fx;
@@ -186,5 +204,9 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   CheckGl("PBO readback");
   async_->write = (async_->write + 1) % async_->slots.size();
   return completed || async_->Collect(ready, metrics);
+}
+
+bool CameraRenderer::CollectReady(CameraFrame& ready, CameraMetrics& metrics) {
+  return async_ && async_->Collect(ready, metrics);
 }
 }  // namespace rm_auto_aim_sim

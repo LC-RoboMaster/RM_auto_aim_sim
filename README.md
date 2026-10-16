@@ -1,5 +1,8 @@
 # RM Auto Aim MuJoCo Simulator
 
+当前完整开发版本位于 [`feat/rmuc-armor-lab`](https://github.com/LC-RoboMaster/RM_auto_aim_sim/tree/feat/rmuc-armor-lab)
+分支，包含已合入的 HDR Shader、异步相机和性能面板；`main` 暂时仍是初始版本。
+
 ## v0.2：RMUC 场地、旋转装甲目标与测试面板
 
 新增四板靶标（r1/r2、h1/h2、XYZ、15° 上倾、红蓝切换、可调正反转）、
@@ -112,6 +115,9 @@ PBO 的时间，`PBO map/copy` 是 CPU 取回缓冲的时间；`Render submit` �
 提交耗时。打开 `Show perf plots` 可查看最近
 15 秒的阶段耗时和进程负载。异步 PBO 队列最多 3 帧，忙时丢弃新采集，防止
 图像越积越旧；消息保留各自采集时刻的仿真时间、内参和位姿。
+暂停后仍会收完已提交的 GPU 图像，队列收空后不重复采集同一仿真时刻；FPS
+随后归零，CPU/RSS 继续更新。检测到重置或历史回退导致采集时间倒退时，先丢弃
+队列中的旧图像，再提交新时间线的图像；这些丢弃也计入 `Dropped`。
 
 在相同配置、场景和显卡上，分别切换两种模式并记录 FPS 与延迟，才能判断
 该设备上的性能差异。无显示器时可运行

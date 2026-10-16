@@ -1,7 +1,7 @@
 name: Camera and simulation checks
 on:
   push:
-    branches: [feat/hdr-shader-telemetry]
+    branches: [main, 'feat/**', 'fix/**']
   pull_request:
 jobs:
   linux:

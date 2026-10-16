@@ -1,3 +1,25 @@
+# 异步相机暂停与时间回退修复（2026-10-16）
+
+环境：Ubuntu 22.04、MuJoCo 3.3.7、GCC 11.4、ROS2 Humble；EGL 使用 Mesa
+llvmpipe（LLVM 15.0.7）软件渲染。
+
+- Release 独立版与 ROS2 Humble 版编译通过，ROS2 可执行文件 `--help` 正常。
+- CTest 2/2 通过；原有 RGB 投影、红蓝灯条、暗背景、HDR Shader、异步方向与
+  采集元数据成像检查全部通过。
+- 新增真实 EGL 队列回归：单次提交后不再渲染也能收帧；重复轮询不重复出帧；
+  重置与非零时刻回退清理旧图像；循环复用 PBO，保留各帧时间与内参。
+- 将新回归运行在旧队列逻辑上（仅补轮询入口）会报
+  `Reset published a stale frame or calibration`；修复后通过。
+- 暂停期间 FPS、CPU/RSS 的墙钟更新已移出“仿真时间变化”分支。
+- CI 的 push 检查覆盖 `main`、`feat/**`、`fix/**`，不再只检查已经合并的
+  `feat/hdr-shader-telemetry` 分支。
+
+本次未运行 GLFW viewer 的暂停交互或 ROS2 DDS 接收联调：当前执行环境无法
+连接桌面显示。队列行为通过 EGL 实测，完整应用编译通过；RTX 4060 和
+1280×1024 / 120 FPS 的端到端性能仍需目标机验证。未修改运行配置 `sim.yaml`。
+
+---
+
 # 暗环境补充验证（2026-10-14）
 
 - 保留用户 `ff5d909` 提交的 1280×1024、真实 K、odom 和图像话题配置。

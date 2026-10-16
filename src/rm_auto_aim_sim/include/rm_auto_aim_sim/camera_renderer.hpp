@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mujoco/mujoco.h>
+
 #include <memory>
 
 #include "rm_auto_aim_sim/types.hpp"
@@ -15,9 +16,11 @@ class CameraRenderer {
   CameraRenderer(const CameraRenderer&) = delete;
   void Render(mjData* data, CameraFrame& frame);
   // Returns a completed capture when the bounded PBO queue has one ready.
-  bool RenderAsync(mjData* data, CameraFrame capture, CameraFrame& ready,
-                   bool shader, bool shadows, double exposure, double bloom,
-                   double lamp_intensity, CameraMetrics& metrics);
+  // A backwards capture timestamp discards pending images before collection.
+  bool RenderAsync(mjData* data, CameraFrame capture, CameraFrame& ready, bool shader, bool shadows,
+                   double exposure, double bloom, double lamp_intensity, CameraMetrics& metrics);
+  // Poll without submitting a new capture, including while simulation is paused.
+  bool CollectReady(CameraFrame& ready, CameraMetrics& metrics);
 
  private:
   const mjModel* model_;

@@ -33,6 +33,10 @@ if result == 0:
     library.RunShaderRenderProbe.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     library.RunShaderRenderProbe.restype = ctypes.c_int
     result = library.RunShaderRenderProbe(os.fsencode(args.config), os.fsencode(args.output + ".shader.ppm"))
+if result == 0:
+    library.RunAsyncQueueProbe.argtypes = [ctypes.c_char_p]
+    library.RunAsyncQueueProbe.restype = ctypes.c_int
+    result = library.RunAsyncQueueProbe(os.fsencode(args.config))
 # Preview images for a browser without adding a runtime image dependency.
 for source in Path(args.output).parent.glob(Path(args.output).name + "*.ppm"):
     magic, dimensions, maximum, pixels = source.read_bytes().split(b"\n", 3)
