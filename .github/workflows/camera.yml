@@ -37,7 +37,7 @@ jobs:
         if: always()
         with:
           name: camera-probe-images
-          path: build/camera_probe.ppm*
+          path: build/camera_probe.ppm*.png
           if-no-files-found: ignore
   ros_humble:
     runs-on: ubuntu-22.04

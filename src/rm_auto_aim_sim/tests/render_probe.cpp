@@ -222,10 +222,20 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
   try {
     auto config = aim::Config::Load(config_path);
     aim::Engine engine(config);
+    auto settings = engine.Target()->Settings();
+    settings.center = {-2, 0, 0};
+    settings.h1 = settings.h2 = .99;
+    settings.color = 0;
+    engine.Target()->Configure(settings, engine.Data());
     aim::CameraRenderer renderer(engine.Model(), engine.CameraId(), config.camera_width,
                                  config.camera_height);
     aim::CameraFrame native, output;
     renderer.Render(engine.Data(), native);
+    {
+      std::ofstream image(std::string(output_path) + ".native.ppm", std::ios::binary);
+      image << "P6\n" << native.width << ' ' << native.height << "\n255\n";
+      image.write(reinterpret_cast<const char*>(native.rgb.data()), native.rgb.size());
+    }
     aim::CameraMetrics metrics;
     auto capture = [&](bool shader) {
       for (int attempt = 0; attempt < 30; ++attempt) {
