@@ -115,6 +115,29 @@ void Error(mujoco::Simulate* sim, const char* message) {
   auto& text = sim->ui1.sect[camera_section].item[8].multi;
   std::snprintf(text.name[0], mjMAXUINAME, "%s", message);
 }
+void RestoreCameraLook(mujoco::Simulate* sim) {
+  const auto& config = engine->GetConfig();
+  brightness_ui = config.lighting_brightness;
+  dark_sky_ui = config.dark_sky;
+  albedo_ui = config.environment_albedo;
+  lamp_white_ui = config.target_light_whiteness;
+  shader_ui = config.camera_shader;
+  shadows_ui = config.camera_shadows;
+  exposure_ui = config.camera_exposure;
+  bloom_ui = config.camera_bloom;
+  lamp_intensity_ui = config.camera_lamp_intensity;
+  engine->SetBrightness(brightness_ui);
+  engine->Environment().SetDarkSky(dark_sky_ui != 0);
+  engine->Environment().SetAlbedo(albedo_ui);
+  if (engine->Target()) {
+    engine->Target()->SetLightWhiteness(lamp_white_ui);
+    target_ui.light_whiteness = lamp_white_ui;
+  }
+  if (sensor)
+    sensor->SetRendering(shader_ui != 0, shadows_ui != 0, exposure_ui,
+                         bloom_ui, lamp_intensity_ui);
+  Error(sim, "YAML camera look restored");
+}
 }  // namespace
 
 void BindViewerEngine(Engine* value) { engine = value; }
@@ -189,17 +212,18 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_EDITNUM, "fx / fy [px]", 1, &camera_ui.fx, "2 1 100000 1 100000"},
       {mjITEM_EDITNUM, "cx / cy [px]", 1, &camera_ui.cx, "2"},
       {mjITEM_BUTTON, "Apply intrinsics", 1},
-      {mjITEM_SLIDERNUM, "Brightness", 1, &brightness_ui, "0 3"},
+      {mjITEM_SLIDERNUM, "Scene light", 1, &brightness_ui, "0 3"},
       {mjITEM_CHECKINT, "Black sky", 1, &dark_sky_ui},
-      {mjITEM_SLIDERNUM, "Scene albedo", 1, &albedo_ui, "0 1"},
-      {mjITEM_SLIDERNUM, "Lamp whiteness", 1, &lamp_white_ui, "0 1"},
+      {mjITEM_SLIDERNUM, "Floor / scene color", 1, &albedo_ui, "0 1"},
+      {mjITEM_SLIDERNUM, "LED white mix", 1, &lamp_white_ui, "0 1"},
       {mjITEM_STATIC, "Camera model", 1, nullptr, "Rectified pinhole RGB\nK alters projection"},
       {mjITEM_STATIC, "Status", 1, nullptr, "Ready"},
       {mjITEM_CHECKINT, "Shader camera", 1, &shader_ui},
       {mjITEM_CHECKINT, "Shadows", 1, &shadows_ui},
       {mjITEM_SLIDERNUM, "Exposure", 1, &exposure_ui, "0.1 8"},
-      {mjITEM_SLIDERNUM, "Bloom", 1, &bloom_ui, "0 2"},
-      {mjITEM_SLIDERNUM, "LED intensity", 1, &lamp_intensity_ui, "0 20"},
+      {mjITEM_SLIDERNUM, "Halo strength", 1, &bloom_ui, "0 2"},
+      {mjITEM_SLIDERNUM, "LED HDR brightness", 1, &lamp_intensity_ui, "0 20"},
+      {mjITEM_BUTTON, "Restore YAML look", 1},
       {mjITEM_SECTION, "HIT STATISTICS", 1},
       {mjITEM_STATIC, "Session", 1, nullptr, "Fired 0\nArmor hits 0\nHit rate 0.00%"},
       {mjITEM_STATIC, "Plate 0/1/2/3", 1, nullptr, "0 / 0 / 0 / 0"},
@@ -248,6 +272,7 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
       if (item->itemid >= 9 && item->itemid <= 13 && sensor)
         sensor->SetRendering(shader_ui != 0, shadows_ui != 0, exposure_ui,
                              bloom_ui, lamp_intensity_ui);
+      if (item->itemid == 14) RestoreCameraLook(sim);
     } else if (item->sectionid == stats_section) {
       if (item->itemid == 3) engine->ResetStatistics();
     } else

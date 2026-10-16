@@ -221,6 +221,14 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
   namespace aim = rm_auto_aim_sim;
   try {
     auto config = aim::Config::Load(config_path);
+    // Exercise the high-contrast YAML look even though the regression fixture
+    // intentionally starts with a bright scene.
+    config.lighting_brightness = .03;
+    config.dark_sky = true;
+    config.environment_albedo = 0;
+    config.target_light_whiteness = .65;
+    config.camera_bloom = .9;
+    config.camera_lamp_intensity = 8;
     aim::Engine engine(config);
     auto settings = engine.Target()->Settings();
     // Put the facing plate near the camera so the generated preview exposes
@@ -228,11 +236,12 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     settings.center = {-3, 0, 0};
     settings.h1 = settings.h2 = .99;
     settings.color = 0;
-    settings.light_whiteness = .45;
+    settings.light_whiteness = config.target_light_whiteness;
     engine.Target()->Configure(settings, engine.Data());
     aim::CameraRenderer renderer(engine.Model(), engine.CameraId(), config.camera_width,
                                  config.camera_height);
     aim::CameraFrame native, output;
+    native.state = engine.State();
     renderer.Render(engine.Data(), native);
     {
       std::ofstream image(std::string(output_path) + ".native.ppm", std::ios::binary);
@@ -243,10 +252,12 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     auto capture = [&](bool shader) {
       for (int attempt = 0; attempt < 30; ++attempt) {
         aim::CameraFrame frame;
+        frame.state = engine.State();
         frame.state.time = 17.0 + attempt * .01;
         frame.capture_wall_time = 123.0 + attempt;
         if (renderer.RenderAsync(engine.Data(), std::move(frame), output,
-                                 shader, false, 1.0, .55, 4.0, metrics)) return;
+                                 shader, false, 1.0, config.camera_bloom,
+                                 config.camera_lamp_intensity, metrics)) return;
         std::this_thread::sleep_for(std::chrono::milliseconds(2));
       }
       throw std::runtime_error("PBO queue did not complete a camera frame");
@@ -259,10 +270,12 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     bool got_shader = false;
     for (int attempt = 0; attempt < 40; ++attempt) {
       aim::CameraFrame frame;
+      frame.state = engine.State();
       frame.state.time = 100 + attempt;
       frame.capture_wall_time = 1000 + attempt;
       if (renderer.RenderAsync(engine.Data(), std::move(frame), output,
-                               true, false, 1.0, .7, 5.0, metrics) &&
+                               true, false, 1.0, config.camera_bloom,
+                               config.camera_lamp_intensity, metrics) &&
           output.state.time >= 100) {
         got_shader = true;
         break;
@@ -278,6 +291,11 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     for (std::size_t i = 0; i < output.rgb.size(); ++i)
       changed += output.rgb[i] != native.rgb[i];
     if (changed < 1000) throw std::runtime_error("HDR shader did not change camera image");
+    for (int row : {5, output.height - 6})
+      for (int col : {5, output.width - 6})
+        for (int ch = 0; ch < 3; ++ch)
+          if (output.rgb[(row * output.width + col) * 3 + ch] > 3)
+            throw std::runtime_error("Shader camera sky/floor is not black");
     std::ofstream image(output_path, std::ios::binary);
     image << "P6\n" << output.width << ' ' << output.height << "\n255\n";
     image.write(reinterpret_cast<const char*>(output.rgb.data()), output.rgb.size());
@@ -286,6 +304,7 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     bool got_unlit = false;
     for (int attempt = 0; attempt < 40; ++attempt) {
       aim::CameraFrame frame;
+      frame.state = engine.State();
       frame.state.time = 200 + attempt;
       if (renderer.RenderAsync(engine.Data(), std::move(frame), output,
                                true, false, 1.0, 0.0, 0.0, metrics) &&
@@ -307,6 +326,37 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     if (lamp_changed < 100)
       throw std::runtime_error("LED radiance/bloom control changed only " +
                                std::to_string(lamp_changed) + " RGB components");
+    std::size_t threshold_lamps = 0;
+    for (std::size_t i = 0; i < lit.size(); i += 3) {
+      const double gray_lit = .299 * lit[i] + .587 * lit[i + 1] + .114 * lit[i + 2];
+      const double gray_unlit = .299 * output.rgb[i] + .587 * output.rgb[i + 1] +
+                                .114 * output.rgb[i + 2];
+      if (gray_lit > 150 && gray_lit > gray_unlit + 20) ++threshold_lamps;
+    }
+    if (threshold_lamps < 5)
+      throw std::runtime_error("HDR LEDs do not reach binary-image threshold");
+    settings.color = 1;
+    engine.Target()->Configure(settings, engine.Data());
+    bool got_blue = false;
+    for (int attempt = 0; attempt < 40; ++attempt) {
+      aim::CameraFrame frame;
+      frame.state = engine.State();
+      frame.state.time = 300 + attempt;
+      if (renderer.RenderAsync(engine.Data(), std::move(frame), output,
+                               true, false, 1.0, config.camera_bloom,
+                               config.camera_lamp_intensity, metrics) &&
+          output.state.time >= 300) {
+        got_blue = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (!got_blue) throw std::runtime_error("Cannot capture blue HDR LEDs");
+    {
+      std::ofstream image(std::string(output_path) + ".blue.ppm", std::ios::binary);
+      image << "P6\n" << output.width << ' ' << output.height << "\n255\n";
+      image.write(reinterpret_cast<const char*>(output.rgb.data()), output.rgb.size());
+    }
     std::cout << "PASS: async RGB orientation, HDR shader, capture metadata, estimated buffers "
               << metrics.gpu_estimate_mib << " MiB\n";
     return 0;

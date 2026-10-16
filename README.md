@@ -98,6 +98,13 @@ MuJoCo 原生画面，方便在同一场景比较。灯条局部照明采用深�
 高光，发光部分进入 RGBA16F 缓冲，Bloom 在四分之一分辨率处理，最后固定曝光
 并转换成 RGB8。场景纹理和基础环境光仍由 MuJoCo 绘制。
 
+默认相机外观面向漫水二值化：`Black sky` 开启，`Floor / scene color` 为 0，
+`Scene light` 为 0.03，使天空、地面及障碍物接近黑色；灯条白色混合为 0.65，
+HDR 亮度为 8，光晕强度为 0.9。右侧滑条可分别调背景亮度、灯条灰度、
+灯条发光和光晕；`Exposure` 会改变整张图像。点击 `Restore YAML look` 可恢复
+`config/sim.yaml` 中的外观参数。Shader 作用于 `/image_raw`；3D viewer 的
+`Gimbal` 视角仍是 MuJoCo 原生预览，查看算法输入请打开图像话题。
+
 右侧 **PERFORMANCE** 显示实测相机 FPS、采集到发布延迟、各 CPU 提交阶段
 耗时、进程 CPU/RSS 和估算的相机缓冲区大小。CPU 100% 表示占满一个逻辑核；
 `GPU render` 是显卡计时查询的场景和 Shader 绘制时间，`GPU transfer` 是显卡写入
