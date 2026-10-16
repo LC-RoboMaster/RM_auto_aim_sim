@@ -38,8 +38,8 @@ struct CameraRenderer::Async {
   std::array<Slot, 3> slots;
   std::size_t read = 0, write = 0;
   std::size_t bytes;
-  Async(int width, int height)
-      : pipeline(width, height), bytes(static_cast<std::size_t>(width) * height * 3) {
+  Async(int width, int height, const mjrContext& context)
+      : pipeline(width, height, context), bytes(static_cast<std::size_t>(width) * height * 3) {
     for (auto& slot : slots) {
       glGenBuffers(1, &slot.pbo);
       glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
@@ -131,7 +131,7 @@ void CameraRenderer::Render(mjData* data, CameraFrame& frame) {
 bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame& ready,
                                  bool shader, bool shadows, double exposure, double bloom,
                                  double lamp_intensity, CameraMetrics& metrics) {
-  if (!async_) async_ = std::make_unique<Async>(width_, height_);
+  if (!async_) async_ = std::make_unique<Async>(width_, height_, context_);
   while (glGetError() != GL_NO_ERROR) {}  // Isolate this frame's GL errors.
   bool completed = async_->Collect(ready, metrics);
   auto& slot = async_->slots[async_->write];

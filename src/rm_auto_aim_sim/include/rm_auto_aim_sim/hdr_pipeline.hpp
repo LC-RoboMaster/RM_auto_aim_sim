@@ -9,7 +9,7 @@ namespace rm_auto_aim_sim {
 // geometry; these shaders add HDR lamp light, bloom and camera response.
 class HdrPipeline {
  public:
-  HdrPipeline(int width, int height);
+  HdrPipeline(int width, int height, const mjrContext& context);
   ~HdrPipeline();
   HdrPipeline(const HdrPipeline&) = delete;
   void Process(const mjvScene& scene, const mjrContext& context,

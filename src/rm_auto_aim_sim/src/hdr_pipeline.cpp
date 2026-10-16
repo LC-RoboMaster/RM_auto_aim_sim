@@ -223,7 +223,7 @@ struct HdrPipeline::Impl {
   GLuint vao = 0, base = 0, depth = 0, hdr = 0, blur[2]{}, final = 0;
   GLuint baseFbo = 0, hdrFbo = 0, blurFbo[2]{}, finalFbo = 0;
   GLuint relight = 0, downsample = 0, blurProgram = 0, camera = 0;
-  explicit Impl(int w, int h)
+  explicit Impl(int w, int h, const mjrContext& context)
       : width(w), height(h), bloomWidth(std::max(1, w / 4)),
         bloomHeight(std::max(1, h / 4)) {
     if (!glGenVertexArrays || !glBlitFramebuffer || !glCreateShader)
@@ -235,7 +235,16 @@ struct HdrPipeline::Impl {
     blurProgram = Program(kBlur);
     camera = Program(kCamera);
     base = Texture(w, h, GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE);
-    depth = Texture(w, h, GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8);
+    GLint sourceDepthFormat = 0;
+    glBindRenderbuffer(GL_RENDERBUFFER, context.offDepthStencil);
+    glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_INTERNAL_FORMAT,
+                                 &sourceDepthFormat);
+    if (sourceDepthFormat != GL_DEPTH24_STENCIL8 &&
+        sourceDepthFormat != GL_DEPTH32F_STENCIL8)
+      throw std::runtime_error("Unsupported MuJoCo depth-stencil buffer format");
+    const GLenum depthPixelType = sourceDepthFormat == GL_DEPTH32F_STENCIL8
+        ? GL_FLOAT_32_UNSIGNED_INT_24_8_REV : GL_UNSIGNED_INT_24_8;
+    depth = Texture(w, h, sourceDepthFormat, GL_DEPTH_STENCIL, depthPixelType);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     hdr = Texture(w, h, GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT);
@@ -260,7 +269,8 @@ struct HdrPipeline::Impl {
   }
 };
 
-HdrPipeline::HdrPipeline(int width, int height) : impl_(std::make_unique<Impl>(width, height)) {}
+HdrPipeline::HdrPipeline(int width, int height, const mjrContext& context)
+    : impl_(std::make_unique<Impl>(width, height, context)) {}
 HdrPipeline::~HdrPipeline() = default;
 
 void HdrPipeline::Process(const mjvScene& scene, const mjrContext& context,
