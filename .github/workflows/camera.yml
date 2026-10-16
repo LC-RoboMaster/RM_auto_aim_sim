@@ -17,9 +17,22 @@ jobs:
         run: cmake -S src/rm_auto_aim_sim -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_ROS2=OFF -DCONDA_PYTHON=$(which python3)
       - name: Compile and run checks
         run: |
-          cmake --build build --parallel 2
-          ctest --test-dir build --output-on-failure
-          MUJOCO_GL=egl python3 src/rm_auto_aim_sim/tests/run_render_test.py --library build/libaim_render_probe.so --output build/camera_probe.ppm
+          set -o pipefail
+          {
+            cmake --build build --parallel 2
+            ctest --test-dir build --output-on-failure
+            MUJOCO_GL=egl python3 src/rm_auto_aim_sim/tests/run_render_test.py --library build/libaim_render_probe.so --output build/camera_probe.ppm
+          } 2>&1 | tee build/check.log
+      - name: Expose failed check details
+        if: failure()
+        run: |
+          if [ -f build/check.log ]; then
+            echo '### Camera check output' >> "$GITHUB_STEP_SUMMARY"
+            echo '```text' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 100 build/check.log >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            grep -E 'error:|CMake Error|FAIL|failed|Traceback' build/check.log | tail -n 10 | while IFS= read -r line; do echo "::error::$line"; done
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
