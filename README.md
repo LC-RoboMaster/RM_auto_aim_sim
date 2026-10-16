@@ -3,6 +3,10 @@
 当前完整开发版本位于 [`feat/rmuc-armor-lab`](https://github.com/LC-RoboMaster/RM_auto_aim_sim/tree/feat/rmuc-armor-lab)
 分支，包含已合入的 HDR Shader、异步相机和性能面板；`main` 暂时仍是初始版本。
 
+**[参数配置与 UI 对照](src/rm_auto_aim_sim/docs/CONFIGURATION.md)**：
+`src/rm_auto_aim_sim/config/sim.yaml` 已集中列出全部参数并逐项添加中文注释。
+相机光照在第 3 组；UI 修改只影响当前运行，不自动写回 YAML。
+
 ## v0.2：RMUC 场地、旋转装甲目标与测试面板
 
 新增四板靶标（r1/r2、h1/h2、XYZ、15° 上倾、红蓝切换、可调正反转）、

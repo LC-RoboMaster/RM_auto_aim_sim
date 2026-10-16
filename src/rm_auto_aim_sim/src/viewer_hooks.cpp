@@ -46,7 +46,7 @@ std::uint64_t epoch = 0;
 bool FirstPerson(const mujoco::Simulate* sim) {
   return sim->cam.type == mjCAMERA_FIXED && sim->cam.fixedcamid == engine->CameraId();
 }
-void ChangeView(mujoco::Simulate* sim) {
+void ChangeView(mujoco::Simulate* sim, bool update_ui = true) {
   if (view_ui == 1) {
     if (sim->cam.type == mjCAMERA_FREE) saved_free_camera = sim->cam;
     sim->cam.type = mjCAMERA_FIXED;
@@ -59,6 +59,7 @@ void ChangeView(mujoco::Simulate* sim) {
     sim->camera = 0;
     camera_was_fixed = false;
   }
+  if (!update_ui) return;  // Initial menus are resized and drawn by the caller.
   mjui_update(-1, -1, &sim->ui0, &sim->uistate, &sim->platform_ui->mjr_context());
   if (control_section >= 0)
     mjui_update(control_section, 1, &sim->ui1, &sim->uistate, &sim->platform_ui->mjr_context());
@@ -147,8 +148,13 @@ bool HasViewerEngine() { return engine != nullptr; }
 void AddViewerMenu(mujoco::Simulate* sim) {
   if (!engine) return;
   mode_ui = static_cast<int>(engine->State().mode);
-  view_ui = 0;
+  view_ui = engine->GetConfig().initial_view == "gimbal" ? 1 : 0;
+  plots_ui = engine->GetConfig().show_charts;
+  performance_plots_ui = engine->GetConfig().show_perf_plots;
+  camera_was_fixed = false;
   saved_free_camera = sim->cam;
+  if (saved_free_camera.type != mjCAMERA_FREE)
+    mjv_defaultFreeCamera(engine->Model(), &saved_free_camera);
   if (engine->Target()) target_ui = engine->Target()->Settings();
   speed_ui = std::abs(target_ui.angular_speed);
   direction_ui = target_ui.angular_speed < 0 ? 1 : 0;
@@ -245,6 +251,9 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   sim->info = 0;
   // Hitbox proxies are invisible in the camera and normal viewer, but still collide.
   sim->opt.geomgroup[3] = 0;
+  std::snprintf(sim->ui1.sect[target_section].item[9].multi.name[2], mjMAXUINAME,
+                "Normal up %.1f deg", target_ui.tilt * 180.0 / mjPI);
+  ChangeView(sim, false);
 }
 
 bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {

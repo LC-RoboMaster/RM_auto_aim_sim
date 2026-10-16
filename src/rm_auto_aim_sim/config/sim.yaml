@@ -1,98 +1,126 @@
-# All units: metres, seconds, radians (except camera_fovy_deg).
+# 仿真启动配置：距离 m、时间 s、角度 rad；名称带 _deg 的角度使用度，内参使用像素。
+# 修改后重启。UI 调节只改变本次运行，不会自动保存到这个文件。
+# ROS2 launch 默认读取安装目录中的配置；显式传 config:=/绝对路径/sim.yaml 可避免改错文件。
+# CAMERA / LIGHT 的控件与下方第 3 组一一对应；完整对照见 docs/CONFIGURATION.md。
 rm_auto_aim_sim:
   ros__parameters:
-    scene_path: "../scenes/lab.xml"
-    initial_mode: "manual"
-    camera_enabled: true
-    camera_width: 1280
-    camera_height: 1024
-    camera_fps: 120.0
-    camera_fovy_deg: 60.0
-    camera_msaa: 0
-    camera_shader: true
-    camera_exposure: 1.0
-    camera_bloom: 0.9
-    camera_lamp_intensity: 8.0
-    camera_shadows: false
-    state_hz: 150.0
-    physics_timestep: 0.0005
-    manual_translation_speed: 2.0
-    manual_angular_speed: 1.5
-    mouse_sensitivity: 0.003
-    yaw_min: -3.141592653589793
-    yaw_max: 3.141592653589793
-    pitch_min: -0.523598775598299
-    pitch_max: 0.785398163397448
-    servo_max_speed: 8.0
-    base_x_min: -12.0
-    base_x_max: 12.0
-    base_y_min: -9.0
-    base_y_max: 9.0
-    base_z_min: 0.2
-    base_z_max: 3.0
-    fire_rate_hz: 15.0
-    projectile_speed: 25.0
-    projectile_diameter: 0.017
-    projectile_mass: 0.0032
-    projectile_pool_size: 128
-    projectile_lifetime: 8.0
-    projectile_hit_lifetime: 2.0
-    fire_command_timeout: 0.0
-    angle_command_timeout: 0.0
-    model_base_body: "base_link"
-    model_yaw_body: "yaw_link"
-    model_pitch_body: "pitch_link"
-    model_camera_body: "camera_link"
-    model_yaw_joint: "yaw_joint"
-    model_pitch_joint: "pitch_joint"
-    model_camera_name: "gimbal_camera"
-    model_muzzle_site: "muzzle"
-    frame_world: "world"
-    frame_base: "odom"
-    frame_yaw: "yaw_link"
-    frame_pitch: "pitch_link"
-    frame_camera: "camera_link"
-    frame_camera_optical: "camera_optical_frame"
-    frame_muzzle: "muzzle_link"
-    topic_image: "/image_raw"
-    topic_camera_info: "/camera_info"
-    topic_pitch_state: "/gimbal/pitch"
-    topic_yaw_state: "/gimbal/yaw"
-    topic_pitch_command: "/gimbal/target_pitch"
-    topic_yaw_command: "/gimbal/target_yaw"
-    topic_fire_command: "/gimbal/fire"
-    topic_joint_states: "/joint_states"
-    topic_clock: "/clock"
-    topic_tf: "/tf"
-    topic_tf_static: "/tf_static"
-    topic_shot_count: "/sim/shot_count"
-    topic_hit_event: "/sim/projectile_hit"
-    topic_camera_fps: "/sim/camera_fps"
+    # ── 1. 场景与 UI 启动状态 ────────────────────────────────────────
+    scene_path: "../scenes/lab.xml" # 场景 XML，相对本 YAML 所在目录解析；默认轻量实验场。
+    field_xml: ""                  # 可选 RMUC 导出 XML；空字符串不加载。相对路径同上。
+    initial_mode: "manual"         # UI: Control mode；manual 手动，auto 接收 ROS2 控制。
+    initial_view: "orbit"          # UI: Camera view；orbit 自由观察，gimbal 云台第一人称。
+    show_charts: true              # UI: Show charts；启动时显示云台角度和命中率曲线。
+    show_perf_plots: false         # UI: Show perf plots；启动时显示阶段耗时和 CPU/RSS 曲线。
 
-    # Four-board target: metres, plate centre heights; rotation in signed rad/s.
-    target_enabled: true
-    target_x: 5.0
-    target_y: 0.0
-    target_z: 0.0
-    target_r1: 0.6
-    target_r2: 0.6
-    target_h1: 0.8
-    target_h2: 0.8
-    target_tilt_deg: 15.0
-    target_angular_speed: 0.0
-    target_initial_angle: 0.0
-    target_color: "blue"
-    lighting_brightness: 0.03
-    # Rectified camera K in pixels. Set true to replace FOV with these values.
-    camera_use_intrinsics: true
-    camera_fx: 1576.115395
-    camera_fy: 1566.175713
-    camera_cx: 656.289108
-    camera_cy: 510.515086
-    # import_rmuc_field.py produces an RMUC config with an absolute field_xml.
-    field_xml: ""
+    # ── 2. 相机采集与标定 ──────────────────────────────────────────
+    camera_enabled: true           # 是否启动独立 RGB 相机线程；不影响 viewer 三维窗口。
+    camera_width: 1280             # 输出宽度 [16,4096] px；修改尺寸时同时检查主点范围。
+    camera_height: 1024            # 输出高度 [16,4096] px。
+    camera_fps: 120.0              # 请求采集频率 (0,500] Hz；实际 FPS 取决于渲染与 DDS。
+    camera_msaa: 0                 # 离屏 MSAA 请求值 [0,8]；启用 Shader 时必须为 0。
+    camera_use_intrinsics: true    # true 使用下面的 K；false 按垂直 FOV 计算对称、居中内参。
+    camera_fovy_deg: 60.0          # 垂直视场角 (1,179) 度；仅 camera_use_intrinsics=false 时生效。
+    camera_fx: 1576.115395         # UI: fx / fy [px]；水平焦距 >0 px。
+    camera_fy: 1566.175713         # 垂直焦距 >0 px；fx 与 fy 可以不同。
+    camera_cx: 656.289108          # UI: cx / cy [px]；水平主点 [0,camera_width)，左上像素中心为 0。
+    camera_cy: 510.515086          # 垂直主点 [0,camera_height)；UI 编辑后点 Apply intrinsics。
 
-    # Binary-image armor testing: black background and brighter grayscale LED colours.
-    dark_sky: true
-    environment_albedo: 0.0
-    target_light_whiteness: 0.65
+    # ── 3. 相机光照、灯条与 HDR / Bloom（UI: CAMERA / LIGHT）─────────
+    # 前四项同时影响原生 viewer 与独立 RGB；后五项仅作用于独立相机输出 /image_raw。
+    # 黑背景预设：dark_sky=true、environment_albedo=0、lighting_brightness=0.03。
+    lighting_brightness: 0.03      # UI: Scene light；场景基础光源/头灯倍率 [0,3]，不关闭灯条自发光。
+    dark_sky: true                # UI: Black sky；true 关闭天空盒与雾，背景为黑色。
+    environment_albedo: 0.0        # UI: Floor / scene color；静态环境颜色/高光倍率 [0,1]，0 黑、1 原色。
+    target_light_whiteness: 0.65   # UI: LED white mix；灯条向白色混合比例 [0,1]，提高灰度；1 时丢失红蓝色差。
+    camera_shader: true            # UI: Shader camera；HDR 灯条补光、Bloom、固定曝光和色调映射总开关。
+    camera_shadows: false          # UI: Shadows；RGB 基础光源阴影开关；增加 GPU 开销，不依赖 Shader 开关。
+    camera_exposure: 1.0           # UI: Exposure；固定曝光倍率 (0,8]（UI 滑条 0.1~8），作用于整幅相机图像。
+    camera_bloom: 0.9              # UI: Halo strength；HDR 图像空间光晕叠加强度 [0,2]，0 关闭光晕。
+    camera_lamp_intensity: 8.0     # UI: LED HDR brightness；附加灯条补光/发光强度 [0,20]，0 仍保留原生自发光。
+    # camera_shader=false 时 exposure/bloom/lamp_intensity 不生效；camera_shadows 仍然生效。
+    # Restore YAML look 恢复本次启动的这 9 项（含 ROS 参数覆盖），不重新读磁盘、不保存 UI。
+    # viewer 的 Gimbal 视角仍是 MuJoCo 原生画面；观察 Shader 成像请查看图像话题。
+
+    # ── 4. 四块旋转装甲板（UI: ARMOR TARGET）───────────────────────
+    target_enabled: true           # 是否在模型中启用四板靶标；false 时不创建目标模块。
+    target_x: 5.0                  # UI: Center XYZ [m]；目标旋转中心世界坐标 X。
+    target_y: 0.0                  # 目标旋转中心世界坐标 Y。
+    target_z: 0.0                  # 中心基准 Z；各板中心实际高度为 target_z + h1/h2。
+    target_r1: 0.6                 # UI: r1 [m]；0/2 号相对板半径 [0.08,5] m。
+    target_r2: 0.6                 # UI: r2 [m]；1/3 号相对板半径 [0.08,5] m。
+    target_h1: 0.8                 # UI: h1 [m]；0/2 号板中心相对高度 [0.08,5] m。
+    target_h2: 0.8                 # UI: h2 [m]；1/3 号板中心相对高度 [0.08,5] m。
+    target_tilt_deg: 15.0          # 装甲正面法线向上倾角 [-60,60] 度；标准预设 15 度。
+    target_angular_speed: 0.0      # UI: Speed + Direction；带符号角速度 [-30,30] rad/s；+Z 逆时针为正。
+    target_initial_angle: 0.0      # 初始朝向 rad；UI 的 Reset heading 将运行时朝向置零。
+    target_color: "blue"           # UI: Color；red 或 blue，灯条白色混合由第 3 组控制。
+
+    # ── 5. 物理、状态发布与手动/自动控制 ──────────────────────────
+    physics_timestep: 0.0005       # 物理步长 (0,0.001] s；当前值对应 2000 Hz。
+    state_hz: 150.0                # 状态、TF、/clock 发布目标频率 Hz；>0 且不超过物理频率。
+    manual_translation_speed: 2.0  # WASD/QE 底座平移速度 >0 m/s。
+    manual_angular_speed: 1.5      # 方向键角速度 >0 rad/s。
+    mouse_sensitivity: 0.003       # 右键拖动的角度灵敏度 >0 rad/鼠标位移单位。
+    yaw_min: -3.141592653589793    # yaw 下限 rad（-180 度）；正 yaw 向左绕 +Z。
+    yaw_max: 3.141592653589793     # yaw 上限 rad（+180 度）；min 必须小于 max。
+    pitch_min: -0.523598775598299  # pitch 下限 rad（-30 度）；正 pitch 抬头。
+    pitch_max: 0.785398163397448   # pitch 上限 rad（+45 度）。
+    servo_max_speed: 8.0            # 理想云台角度伺服最大速度 >0 rad/s。
+    base_x_min: -12.0              # 底座 X 移动下限 m；每个轴的 min 必须小于 max。
+    base_x_max: 12.0               # 底座 X 移动上限 m。
+    base_y_min: -9.0               # 底座 Y 移动下限 m。
+    base_y_max: 9.0                # 底座 Y 移动上限 m。
+    base_z_min: 0.2                # 底座 Z 移动下限 m。
+    base_z_max: 3.0                # 底座 Z 移动上限 m。
+    angle_command_timeout: 0.0     # ROS 角度命令超时 >=0 s；0 持续保持，超时在当前位置停跟踪。
+    fire_command_timeout: 0.0      # ROS 开火命令超时 >=0 s；0 保持 true 到 false/切模式/重置。
+
+    # ── 6. 弹丸与连射 ────────────────────────────────────────────
+    fire_rate_hz: 15.0             # 连射频率 >0 Hz，且不超过物理频率。
+    projectile_speed: 25.0         # 枪口初速 >0 m/s；初速×物理步长不得大于弹丸直径。
+    projectile_diameter: 0.017     # 弹丸直径 >0 m（17 mm），不是半径。
+    projectile_mass: 0.0032        # 弹丸质量 >0 kg（3.2 g）。
+    projectile_pool_size: 128      # 固定对象池槽数 [1,2048]；耗尽时跳过发射，不动态扩容。
+    projectile_lifetime: 8.0       # 飞行寿命 >0 s，按仿真时间回收。
+    projectile_hit_lifetime: 2.0   # 首次接触后保留时长 >0 s；飞行寿命仍会限制总寿命。
+
+    # ── 7. MuJoCo 模型对象绑定（须与场景 XML 的 name 一致）──────────
+    model_base_body: "base_link"   # mocap 云台底座 body。
+    model_yaw_body: "yaw_link"     # yaw 轴 body。
+    model_pitch_body: "pitch_link" # pitch 轴 body。
+    model_camera_body: "camera_link" # 固定相机 body。
+    model_yaw_joint: "yaw_joint"   # yaw 铰链 joint。
+    model_pitch_joint: "pitch_joint" # pitch 铰链 joint。
+    model_camera_name: "gimbal_camera" # MuJoCo camera。
+    model_muzzle_site: "muzzle"    # 枪口 site；弹丸沿该 site 的 +X 方向发射。
+
+    # ── 8. ROS TF 名称（与 XML 对象名独立，不可重复、为空或以 / 开头）─
+    frame_world: "world"           # 世界坐标系；x 前、y 左、z 上。
+    frame_base: "odom"             # 云台底座坐标系；保留当前算法使用的 odom 命名。
+    frame_yaw: "yaw_link"          # yaw 轴坐标系。
+    frame_pitch: "pitch_link"      # pitch 轴坐标系。
+    frame_camera: "camera_link"    # 相机本体坐标系；x 前、y 左、z 上。
+    frame_camera_optical: "camera_optical_frame" # 图像光学系；x 右、y 下、z 前。
+    frame_muzzle: "muzzle_link"    # 枪口坐标系。
+
+    # ── 9. ROS2 话题（独立运行版不发布/订阅）───────────────────────
+    # 图像与 CameraInfo：SensorDataQoS / best effort / depth=2；同帧时间戳一致。
+    topic_image: "/image_raw"      # 发布 sensor_msgs/Image，rgb8，无畸变相机图像。
+    topic_camera_info: "/camera_info" # 发布 sensor_msgs/CameraInfo，与实际 K 对应。
+    topic_camera_fps: "/sim/camera_fps" # 发布 Float64，相机输出帧携带的最近墙钟 FPS。
+    # 状态输出；除 /clock 外为 reliable。数值单位 rad、rad/s，统计比例为 0~1。
+    topic_pitch_state: "/gimbal/pitch" # 发布 Float64，实际 pitch 角度 rad。
+    topic_yaw_state: "/gimbal/yaw" # 发布 Float64，实际 yaw 角度 rad。
+    topic_joint_states: "/joint_states" # 发布 JointState，yaw/pitch 角度与角速度。
+    topic_clock: "/clock"          # 发布 rosgraph_msgs/Clock，best effort，MuJoCo 仿真时间。
+    topic_tf: "/tf"                # 发布动态 world→base→yaw→pitch 变换。
+    topic_tf_static: "/tf_static"  # 发布固定 pitch→camera→optical、pitch→muzzle；transient local。
+    topic_shot_count: "/sim/shot_count" # 发布 UInt64，自物理重置起的累计成功发射数。
+    topic_hit_event: "/sim/projectile_hit" # 发布 String/JSON，每颗弹丸的首次接触事件。
+    topic_hit_count: "/sim/armor_hit_count" # 发布 UInt64，本统计周期装甲命中数。
+    topic_hit_rate: "/sim/armor_hit_rate" # 发布 Float64，本统计周期命中比例 0~1。
+    topic_statistics: "/sim/statistics" # 发布 String/JSON，epoch、发射/命中及各板计数。
+    # 控制输入：reliable / volatile / depth=1；需先切到 auto 模式才接收。
+    topic_pitch_command: "/gimbal/target_pitch" # 订阅 Float64，绝对目标 pitch rad。
+    topic_yaw_command: "/gimbal/target_yaw" # 订阅 Float64，绝对目标 yaw rad。
+    topic_fire_command: "/gimbal/fire" # 订阅 Bool，true 持续连射，false 停止。

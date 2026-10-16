@@ -1,6 +1,10 @@
-// Single source of truth for YAML and ROS parameters. Distances: m; angles: rad.
+// Canonical YAML/ROS names, types and fallback values. Distances: m; angles: rad except *_deg.
+// config/sim.yaml explicitly supplies the scene preset, overriding these fallbacks.
 AIM_PARAMETER(std::string, scene_path, "../scenes/lab.xml")
 AIM_PARAMETER(std::string, initial_mode, "manual")
+AIM_PARAMETER(std::string, initial_view, "orbit")
+AIM_PARAMETER(bool, show_charts, true)
+AIM_PARAMETER(bool, show_perf_plots, false)
 AIM_PARAMETER(bool, camera_enabled, true)
 AIM_PARAMETER(int, camera_width, 640)
 AIM_PARAMETER(int, camera_height, 480)

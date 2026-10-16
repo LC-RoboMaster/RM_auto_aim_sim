@@ -94,6 +94,10 @@ if(BUILD_TESTING)
   target_link_libraries(aim_lab_tests PRIVATE aim_core)
   add_test(NAME armor_target_statistics COMMAND aim_lab_tests
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.yaml")
+  add_executable(aim_config_tests tests/config_tests.cpp)
+  target_link_libraries(aim_config_tests PRIVATE aim_core)
+  add_test(NAME configuration_contract COMMAND aim_config_tests
+    "${CMAKE_CURRENT_SOURCE_DIR}/config/sim.yaml")
   add_library(aim_render_probe SHARED tests/render_probe.cpp tests/async_render_probe.cpp)
   target_link_libraries(aim_render_probe PRIVATE aim_camera)
 endif()
