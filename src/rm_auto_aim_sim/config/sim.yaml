@@ -16,7 +16,7 @@ rm_auto_aim_sim:
     camera_enabled: true           # 是否启动独立 RGB 相机线程；不影响 viewer 三维窗口。
     camera_width: 1280             # 输出宽度 [16,4096] px；修改尺寸时同时检查主点范围。
     camera_height: 1024            # 输出高度 [16,4096] px。
-    camera_fps: 120.0              # 请求采集频率 (0,500] Hz；实际 FPS 取决于渲染与 DDS。
+    camera_fps: 200.0              # 请求采集频率 (0,500] Hz；实际 FPS 取决于渲染与 DDS。
     camera_msaa: 0                 # 离屏 MSAA 请求值 [0,8]；启用 Shader 时必须为 0。
     camera_use_intrinsics: true    # true 使用下面的 K；false 按垂直 FOV 计算对称、居中内参。
     camera_fovy_deg: 60.0          # 垂直视场角 (1,179) 度；仅 camera_use_intrinsics=false 时生效。
@@ -28,15 +28,15 @@ rm_auto_aim_sim:
     # ── 3. 相机光照、灯条与 HDR / Bloom（UI: CAMERA / LIGHT）─────────
     # 前四项同时影响原生 viewer 与独立 RGB；后五项仅作用于独立相机输出 /image_raw。
     # 黑背景预设：dark_sky=true、environment_albedo=0、lighting_brightness=0.03。
-    lighting_brightness: 0.03      # UI: Scene light；场景基础光源/头灯倍率 [0,3]，不关闭灯条自发光。
+    lighting_brightness: 0.285      # UI: Scene light；场景基础光源/头灯倍率 [0,3]，不关闭灯条自发光。
     dark_sky: true                # UI: Black sky；true 关闭天空盒与雾，背景为黑色。
-    environment_albedo: 0.0        # UI: Floor / scene color；静态环境颜色/高光倍率 [0,1]，0 黑、1 原色。
-    target_light_whiteness: 0.65   # UI: LED white mix；灯条向白色混合比例 [0,1]，提高灰度；1 时丢失红蓝色差。
+    environment_albedo: 0.495        # UI: Floor / scene color；静态环境颜色/高光倍率 [0,1]，0 黑、1 原色。
+    target_light_whiteness: 0.06   # UI: LED white mix；灯条向白色混合比例 [0,1]，提高灰度；1 时丢失红蓝色差。
     camera_shader: true            # UI: Shader camera；HDR 灯条补光、Bloom、固定曝光和色调映射总开关。
     camera_shadows: false          # UI: Shadows；RGB 基础光源阴影开关；增加 GPU 开销，不依赖 Shader 开关。
-    camera_exposure: 1.0           # UI: Exposure；固定曝光倍率 (0,8]（UI 滑条 0.1~8），作用于整幅相机图像。
-    camera_bloom: 0.9              # UI: Halo strength；HDR 图像空间光晕叠加强度 [0,2]，0 关闭光晕。
-    camera_lamp_intensity: 8.0     # UI: LED HDR brightness；附加灯条补光/发光强度 [0,20]，0 仍保留原生自发光。
+    camera_exposure: 1.17           # UI: Exposure；固定曝光倍率 (0,8]（UI 滑条 0.1~8），作用于整幅相机图像。
+    camera_bloom: 0.34              # UI: Halo strength；HDR 图像空间光晕叠加强度 [0,2]，0 关闭光晕。
+    camera_lamp_intensity: 3.7     # UI: LED HDR brightness；附加灯条补光/发光强度 [0,20]，0 仍保留原生自发光。
     # camera_shader=false 时 exposure/bloom/lamp_intensity 不生效；camera_shadows 仍然生效。
     # Restore YAML look 恢复本次启动的这 9 项（含 ROS 参数覆盖），不重新读磁盘、不保存 UI。
     # viewer 的 Gimbal 视角仍是 MuJoCo 原生画面；观察 Shader 成像请查看图像话题。
