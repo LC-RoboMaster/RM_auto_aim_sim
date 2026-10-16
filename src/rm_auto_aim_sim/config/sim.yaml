@@ -34,6 +34,7 @@ rm_auto_aim_sim:
     environment_albedo: 0.495        # UI: Floor / scene color；静态环境颜色/高光倍率 [0,1]，0 黑、1 原色。
     target_light_whiteness: 0.06   # UI: LED white mix；灯条向白色混合比例 [0,1]，提高灰度；1 时丢失红蓝色差。
     camera_shader: true            # UI: Shader camera；HDR 灯条补光、Bloom、固定曝光和色调映射总开关。
+    camera_projectile_opacity: 1.0  # UI: ROS bullet opacity；不透明度 [0,1]，0 隐藏、1 完全显示；仅相机，不影响 viewer/物理/命中。
     camera_shadows: false          # UI: Shadows；RGB 基础光源阴影开关；增加 GPU 开销，不依赖 Shader 开关。
     camera_exposure: 1.17           # UI: Exposure；固定曝光倍率 (0,8]（UI 滑条 0.1~8），作用于整幅相机图像。
     camera_bloom: 0.34              # UI: Halo strength；HDR 图像空间光晕叠加强度 [0,2]，0 关闭光晕。

@@ -25,6 +25,7 @@ class SensorWorker {
   bool Failed() const { return failed_.load() || publisher_.Failed(); }
   void SetRendering(bool shader, bool shadows, double exposure, double bloom,
                     double lamp_intensity);
+  void SetProjectileOpacity(double opacity);
   CameraMetrics Metrics() const;
 
  private:
@@ -39,6 +40,7 @@ class SensorWorker {
   std::thread thread_;
   std::atomic_bool stop_{false}, failed_{false};
   std::atomic_bool shader_{true}, shadows_{false};
+  std::atomic<double> projectile_opacity_{1};
   std::atomic<double> exposure_{1}, bloom_{.55}, lamp_intensity_{4};
   mutable std::mutex metrics_mutex_;
   CameraMetrics metrics_;

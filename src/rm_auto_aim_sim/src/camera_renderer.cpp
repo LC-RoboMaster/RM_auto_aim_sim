@@ -115,6 +115,11 @@ CameraRenderer::CameraRenderer(const mjModel* model, int camera_id, int width, i
       width_(width),
       height_(height),
       readback_(static_cast<std::size_t>(width) * height * 3) {
+  projectile_geoms_.resize(model->ngeom);
+  for (int id = 0; id < model->ngeom; ++id) {
+    const char* name = mj_id2name(model, mjOBJ_GEOM, id);
+    projectile_geoms_[id] = name && std::string(name).rfind("projectile_", 0) == 0;
+  }
   mjv_defaultScene(&scene_);
   mjr_defaultContext(&context_);
   mjv_defaultOption(&option_);
@@ -138,8 +143,33 @@ CameraRenderer::~CameraRenderer() {
   mjr_freeContext(&context_);
 }
 
+void CameraRenderer::SetProjectileOpacity(double opacity) {
+  if (!std::isfinite(opacity) || opacity < 0 || opacity > 1)
+    throw std::invalid_argument("camera_projectile_opacity must be in [0,1]");
+  projectile_opacity_ = static_cast<float>(opacity);
+}
+
+void CameraRenderer::ApplyProjectileOpacity() {
+  if (projectile_opacity_ == 1) return;
+  int retained = 0;
+  for (int i = 0; i < scene_.ngeom; ++i) {
+    auto geom = scene_.geoms[i];
+    if (geom.objtype == mjOBJ_GEOM && geom.objid >= 0 &&
+        geom.objid < static_cast<int>(projectile_geoms_.size()) &&
+        projectile_geoms_[geom.objid]) {
+      // Remove hidden bullets entirely: no depth, shadow, or HDR light contribution.
+      if (projectile_opacity_ == 0) continue;
+      geom.rgba[3] *= projectile_opacity_;
+      geom.transparent = 1;  // mjv_updateScene classified the original opaque material.
+    }
+    scene_.geoms[retained++] = geom;
+  }
+  scene_.ngeom = retained;
+}
+
 void CameraRenderer::Render(mjData* data, CameraFrame& frame) {
   mjv_updateScene(model_, data, &option_, nullptr, &camera_, mjCAT_ALL, &scene_);
+  ApplyProjectileOpacity();
   SetBlackSky(&scene_, frame.state.dark_sky);
   mjr_setBuffer(mjFB_OFFSCREEN, &context_);
   const mjrRect viewport{0, 0, width_, height_};
@@ -179,6 +209,7 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   }
   const auto scene_begin = Clock::now();
   mjv_updateScene(model_, data, &option_, nullptr, &camera_, mjCAT_ALL, &scene_);
+  ApplyProjectileOpacity();
   SetBlackSky(&scene_, capture.state.dark_sky);
   scene_.flags[mjRND_SHADOW] = shadows;
   if (shadows)

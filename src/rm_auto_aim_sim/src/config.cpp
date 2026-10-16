@@ -85,6 +85,9 @@ void Config::Validate() const {
               std::isfinite(camera_lamp_intensity) && camera_lamp_intensity >= 0 &&
               camera_lamp_intensity <= 20,
           "camera shader exposure/bloom/lamp settings invalid");
+  require(std::isfinite(camera_projectile_opacity) && camera_projectile_opacity >= 0 &&
+              camera_projectile_opacity <= 1,
+          "camera_projectile_opacity must be in [0,1]");
   require(!camera_shader || camera_msaa == 0, "camera_shader requires camera_msaa: 0");
   require(!camera_use_intrinsics ||
               (positive(camera_fx) && positive(camera_fy) && std::isfinite(camera_cx) &&

@@ -15,6 +15,8 @@ class CameraRenderer {
   ~CameraRenderer();
   CameraRenderer(const CameraRenderer&) = delete;
   void Render(mjData* data, CameraFrame& frame);
+  // Sensor scene only; the physics model and desktop viewer remain unchanged.
+  void SetProjectileOpacity(double opacity);
   // Returns a completed capture when the bounded PBO queue has one ready.
   // A backwards capture timestamp discards pending images before collection.
   bool RenderAsync(mjData* data, CameraFrame capture, CameraFrame& ready, bool shader, bool shadows,
@@ -23,6 +25,9 @@ class CameraRenderer {
   bool CollectReady(CameraFrame& ready, CameraMetrics& metrics);
 
  private:
+  void ApplyProjectileOpacity();
+  std::vector<bool> projectile_geoms_;
+  float projectile_opacity_ = 1;
   const mjModel* model_;
   int camera_id_, width_, height_;
   mjvScene scene_{};

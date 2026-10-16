@@ -27,6 +27,7 @@ CameraIntrinsics camera_ui{};
 double speed_ui = 0, brightness_ui = 1, albedo_ui = 1, lamp_white_ui = 0;
 int dark_sky_ui = 0;
 int shader_ui = 1, shadows_ui = 0;
+double projectile_opacity_ui = 1;
 double exposure_ui = 1, bloom_ui = .55, lamp_intensity_ui = 4;
 bool camera_was_fixed = false;
 mjvCamera saved_free_camera{};
@@ -128,6 +129,8 @@ void RestoreCameraLook(mujoco::Simulate* sim) {
   exposure_ui = config.camera_exposure;
   bloom_ui = config.camera_bloom;
   lamp_intensity_ui = config.camera_lamp_intensity;
+  projectile_opacity_ui = config.camera_projectile_opacity;
+  if (sensor) sensor->SetProjectileOpacity(projectile_opacity_ui);
   engine->SetBrightness(brightness_ui);
   engine->Environment().SetDarkSky(dark_sky_ui != 0);
   engine->Environment().SetAlbedo(albedo_ui);
@@ -170,6 +173,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   exposure_ui = camera_config.camera_exposure;
   bloom_ui = camera_config.camera_bloom;
   lamp_intensity_ui = camera_config.camera_lamp_intensity;
+  projectile_opacity_ui = camera_config.camera_projectile_opacity;
   history.clear();
   perf_history.clear();
   last_perf_sample = -1;
@@ -231,6 +235,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SLIDERNUM, "Halo strength", 1, &bloom_ui, "0 2"},
       {mjITEM_SLIDERNUM, "LED HDR brightness", 1, &lamp_intensity_ui, "0 20"},
       {mjITEM_BUTTON, "Restore YAML look", 1},
+      {mjITEM_SLIDERNUM, "ROS bullet opacity", 1, &projectile_opacity_ui, "0 1"},
       {mjITEM_SECTION, "HIT STATISTICS", 1},
       {mjITEM_STATIC, "Session", 1, nullptr, "Fired 0\nArmor hits 0\nHit rate 0.00%"},
       {mjITEM_STATIC, "Plate 0/1/2/3", 1, nullptr, "0 / 0 / 0 / 0"},
@@ -283,6 +288,8 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
         sensor->SetRendering(shader_ui != 0, shadows_ui != 0, exposure_ui,
                              bloom_ui, lamp_intensity_ui);
       if (item->itemid == 14) RestoreCameraLook(sim);
+      if (item->itemid == 15 && sensor)
+        sensor->SetProjectileOpacity(projectile_opacity_ui);
     } else if (item->sectionid == stats_section) {
       if (item->itemid == 3) engine->ResetStatistics();
     } else

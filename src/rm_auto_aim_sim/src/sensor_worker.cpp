@@ -3,6 +3,7 @@
 #include <GLFW/glfw3.h>
 
 #include <chrono>
+#include <cmath>
 #include <ctime>
 #include <fstream>
 #include <iostream>
@@ -33,6 +34,7 @@ SensorWorker::SensorWorker(const Engine& engine, Snapshot snapshot, Publish publ
       camera_id_(engine.CameraId()),
       snapshot_(std::move(snapshot)),
       publisher_(std::move(publish)) {
+  SetProjectileOpacity(config_.camera_projectile_opacity);
   SetRendering(config_.camera_shader, config_.camera_shadows, config_.camera_exposure,
                config_.camera_bloom, config_.camera_lamp_intensity);
   try {
@@ -65,6 +67,12 @@ void SensorWorker::Start() {
   publisher_.Start();
   thread_ = std::thread(&SensorWorker::Run, this);
 }
+void SensorWorker::SetProjectileOpacity(double opacity) {
+  if (!std::isfinite(opacity) || opacity < 0 || opacity > 1)
+    throw std::invalid_argument("camera_projectile_opacity must be in [0,1]");
+  projectile_opacity_.store(opacity);
+}
+
 void SensorWorker::SetRendering(bool shader, bool shadows, double exposure, double bloom,
                                 double lamp_intensity) {
   shader_.store(shader);
@@ -120,6 +128,7 @@ void SensorWorker::Run() {
         frame.capture_wall_time = WallTime();
         const double capture_sim_time = frame.state.time;
         if (capture_sim_time < last_time) publisher_.DiscardPending();
+        renderer.SetProjectileOpacity(projectile_opacity_.load());
         completed =
             renderer.RenderAsync(data_, std::move(frame), ready, shader_.load(), shadows_.load(),
                                  exposure_.load(), bloom_.load(), lamp_intensity_.load(), metrics);

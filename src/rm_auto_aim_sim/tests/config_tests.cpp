@@ -64,6 +64,14 @@ int main(int argc, char** argv) {
                 target.color == (config.target_color == "blue" ? 1 : 0),
             "Startup target configuration did not reach the armor model");
     }
+    for (double opacity : {0., .5, 1., -.1, 1.1, std::nan("")}) {
+      auto candidate = config;
+      candidate.camera_projectile_opacity = opacity;
+      bool accepted = true;
+      try { candidate.Validate(); } catch (const std::runtime_error&) { accepted = false; }
+      Check(accepted == (std::isfinite(opacity) && opacity >= 0 && opacity <= 1),
+            "Projectile opacity range validation failed");
+    }
     auto alternate = config;
     alternate.initial_view = config.initial_view == "orbit" ? "gimbal" : "orbit";
     alternate.Validate();
