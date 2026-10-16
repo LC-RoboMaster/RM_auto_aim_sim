@@ -39,3 +39,24 @@ jobs:
           name: camera-probe-images
           path: build/camera_probe.ppm*
           if-no-files-found: ignore
+  ros_humble:
+    runs-on: ubuntu-22.04
+    container: ros:humble-ros-base-jammy
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ROS bridge and camera dependencies
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends g++ cmake ninja-build python3-pip libglfw3-dev libyaml-cpp-dev libgl1-mesa-dev \
+            ros-humble-ament-cmake ros-humble-rclcpp ros-humble-rcl-interfaces \
+            ros-humble-sensor-msgs ros-humble-geometry-msgs ros-humble-rosgraph-msgs \
+            ros-humble-std-msgs ros-humble-tf2-msgs
+          /usr/bin/python3 -m pip install mujoco==3.3.7
+      - name: Build ROS 2 Humble bridge
+        shell: bash
+        run: |
+          source /opt/ros/humble/setup.bash
+          cmake -S src/rm_auto_aim_sim -B build_ros -G Ninja -DCMAKE_BUILD_TYPE=Release \
+            -DENABLE_ROS2=ON -DBUILD_TESTING=OFF -DCONDA_PYTHON=/usr/bin/python3
+          cmake --build build_ros --parallel 2
+          build_ros/rm_auto_aim_sim --help
