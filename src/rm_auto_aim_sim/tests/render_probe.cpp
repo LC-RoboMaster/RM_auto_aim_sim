@@ -295,6 +295,11 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
       std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     if (!got_unlit) throw std::runtime_error("Cannot capture no-lamp baseline");
+    {
+      std::ofstream image(std::string(output_path) + ".unlit.ppm", std::ios::binary);
+      image << "P6\n" << output.width << ' ' << output.height << "\n255\n";
+      image.write(reinterpret_cast<const char*>(output.rgb.data()), output.rgb.size());
+    }
     std::size_t lamp_changed = 0;
     for (std::size_t i = 0; i < lit.size(); ++i)
       lamp_changed += std::abs(int(lit[i]) - int(output.rgb[i])) >= 3;

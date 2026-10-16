@@ -85,10 +85,12 @@ void main() {
     radiance += (albedo * (1.0 - f) / 3.14159265 + f * spec) * irradiance * nl;
     // The source pixels are identified using both depth and chroma, so an
     // occluded bar cannot shine through a foreground object.
-    float nearSource = 1.0 - smoothstep(.04, .27, sqrt(d2));
+    float nearSource = 1.0 - smoothstep(.08, .45, sqrt(d2));
     float chroma = max(max(encoded.r, encoded.g), encoded.b) -
                    min(min(encoded.r, encoded.g), encoded.b);
-    radiance += lightColor[i] * lampIntensity * 1.4 * nearSource *
+    // A small LED can occupy less than one quarter-resolution bloom texel.
+    // Keep its visible core in HDR so downsampling still carries radiance.
+    radiance += lightColor[i] * lampIntensity * 5.0 * nearSource *
                 smoothstep(.05, .20, chroma);
   }
   outColor = vec4(radiance, 1.0);
