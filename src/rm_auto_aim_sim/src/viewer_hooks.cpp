@@ -151,7 +151,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   Figure(rate_figure, "Armor hit rate [%]", "seconds ago");
   std::strcpy(rate_figure.linename[0], "cumulative %");
   Figure(timing_figure, "Camera stages [ms]", "seconds ago");
-  std::strcpy(timing_figure.linename[0], "render submit");
+  std::strcpy(timing_figure.linename[0], "GPU render");
   std::strcpy(timing_figure.linename[1], "readback");
   std::strcpy(timing_figure.linename[2], "ROS publish");
   Color(timing_figure.linergb[2], .6f, .7f, .95f);
@@ -206,7 +206,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_CHECKINT, "Show charts", 1, &plots_ui},
       {mjITEM_SECTION, "PERFORMANCE", 1},
       {mjITEM_STATIC, "Camera", 1, nullptr, "FPS 0\nLatency 0 ms\nDropped 0"},
-      {mjITEM_STATIC, "Stages", 1, nullptr, "Snapshot 0 ms\nScene 0 ms\nRender submit 0 ms"},
+      {mjITEM_STATIC, "Stages", 1, nullptr, "Snapshot 0 ms\nScene 0 ms\nGPU render 0 ms\nRender submit 0 ms"},
       {mjITEM_STATIC, "Output", 1, nullptr, "Readback 0 ms\nROS publish 0 ms"},
       {mjITEM_STATIC, "Process", 1, nullptr, "CPU 0% (100%=1 core)\nRSS 0 MiB\nRender buffers ~0 MiB"},
       {mjITEM_CHECKINT, "Show perf plots", 1, &performance_plots_ui},
@@ -340,7 +340,8 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
     auto& stages = sim->ui1.sect[performance_section].item[1].multi;
     std::snprintf(stages.name[0], mjMAXUINAME, "Snapshot %.2f ms", m.snapshot_ms);
     std::snprintf(stages.name[1], mjMAXUINAME, "Scene %.2f ms", m.scene_ms);
-    std::snprintf(stages.name[2], mjMAXUINAME, "Render submit %.2f ms", m.render_ms);
+    std::snprintf(stages.name[2], mjMAXUINAME, "GPU render %.2f ms", m.gpu_ms);
+    std::snprintf(stages.name[3], mjMAXUINAME, "Render submit %.2f ms", m.render_ms);
     auto& output = sim->ui1.sect[performance_section].item[2].multi;
     std::snprintf(output.name[0], mjMAXUINAME, "Readback %.2f ms", m.readback_ms);
     std::snprintf(output.name[1], mjMAXUINAME, "ROS publish %.2f ms", m.publish_ms);
@@ -354,7 +355,7 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
     const double wall = std::chrono::duration<double>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
     if (last_perf_sample < 0 || wall - last_perf_sample >= .2) {
-      perf_history.push_back({wall, m.render_ms, m.readback_ms, m.publish_ms,
+      perf_history.push_back({wall, m.gpu_ms, m.readback_ms, m.publish_ms,
                               m.cpu_percent, m.rss_mib});
       last_perf_sample = wall;
       if (perf_history.size() > 75) perf_history.pop_front();

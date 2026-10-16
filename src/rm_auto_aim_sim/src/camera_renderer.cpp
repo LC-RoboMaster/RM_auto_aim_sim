@@ -31,6 +31,7 @@ void CheckGl(const char* stage) {
 struct CameraRenderer::Async {
   struct Slot {
     GLuint pbo = 0;
+    GLuint timer = 0;
     GLsync fence = nullptr;
     CameraFrame frame;
   };
@@ -42,6 +43,7 @@ struct CameraRenderer::Async {
       : pipeline(width, height, context), bytes(static_cast<std::size_t>(width) * height * 3) {
     for (auto& slot : slots) {
       glGenBuffers(1, &slot.pbo);
+      glGenQueries(1, &slot.timer);
       glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
       glBufferData(GL_PIXEL_PACK_BUFFER, bytes, nullptr, GL_STREAM_READ);
     }
@@ -50,6 +52,7 @@ struct CameraRenderer::Async {
   ~Async() {
     for (auto& slot : slots) {
       if (slot.fence) glDeleteSync(slot.fence);
+      glDeleteQueries(1, &slot.timer);
       glDeleteBuffers(1, &slot.pbo);
     }
   }
@@ -59,6 +62,9 @@ struct CameraRenderer::Async {
     const GLenum result = glClientWaitSync(slot.fence, 0, 0);
     if (result == GL_TIMEOUT_EXPIRED) return false;
     if (result == GL_WAIT_FAILED) throw std::runtime_error("Camera PBO fence wait failed");
+    GLuint64 gpu_nanoseconds = 0;
+    glGetQueryObjectui64v(slot.timer, GL_QUERY_RESULT, &gpu_nanoseconds);
+    metrics.gpu_ms = gpu_nanoseconds / 1e6;
     const auto begin = Clock::now();
     glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
     void* pixels = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, bytes, GL_MAP_READ_BIT);
@@ -145,12 +151,14 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   scene_.flags[mjRND_SHADOW] = shadows;
   metrics.scene_ms = Ms(scene_begin, Clock::now());
   const auto render_begin = Clock::now();
+  glBeginQuery(GL_TIME_ELAPSED, slot.timer);
   mjr_setBuffer(mjFB_OFFSCREEN, &context_);
   mjr_render({0, 0, width_, height_}, &scene_, &context_);
   CheckGl("MuJoCo render");
   const auto k = ModelIntrinsics(model_, camera_id_, width_, height_);
   async_->pipeline.Process(scene_, context_, k.fx, k.fy, k.cx, k.cy,
                            exposure, bloom, lamp_intensity, shader);
+  glEndQuery(GL_TIME_ELAPSED);
   CheckGl("HDR pipeline");
   metrics.render_ms = Ms(render_begin, Clock::now());
   metrics.gpu_estimate_mib = async_->pipeline.EstimatedMiB() +
