@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <iostream>
 #include <stdexcept>
 #include <string>
 
@@ -223,6 +224,8 @@ struct HdrPipeline::Impl {
   GLuint vao = 0, base = 0, depth = 0, hdr = 0, blur[2]{}, final = 0;
   GLuint baseFbo = 0, hdrFbo = 0, blurFbo[2]{}, finalFbo = 0;
   GLuint relight = 0, downsample = 0, blurProgram = 0, camera = 0;
+  bool reportedLights = false;
+  bool reportedDepth = false;
   explicit Impl(int w, int h, const mjrContext& context)
       : width(w), height(h), bloomWidth(std::max(1, w / 4)),
         bloomHeight(std::max(1, h / 4)) {
@@ -287,6 +290,16 @@ void HdrPipeline::Process(const mjvScene& scene, const mjrContext& context,
   glBlitFramebuffer(0, 0, p.width, p.height, 0, 0, p.width, p.height,
                     GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
   Check("source blit");
+  if (shader_enabled && !p.reportedDepth) {
+    glBindFramebuffer(GL_READ_FRAMEBUFFER, p.baseFbo);
+    for (int x : {p.width / 4, p.width / 2, 3 * p.width / 4}) {
+      float depth = 1;
+      glReadPixels(x, p.height / 2, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+      std::cerr << "[camera] HDR copied depth at x=" << x << ": " << depth << '\n';
+    }
+    Check("depth diagnostic");
+    p.reportedDepth = true;
+  }
   if (shader_enabled) {
     const auto& cam = scene.camera[0];
     glUseProgram(p.relight);
@@ -312,6 +325,10 @@ void HdrPipeline::Process(const mjvScene& scene, const mjrContext& context,
         colors[3 * count + c] = geom.rgba[c] * geom.emission;
       }
       ++count;
+    }
+    if (!p.reportedLights) {
+      std::cerr << "[camera] HDR emissive geoms: " << count << '\n';
+      p.reportedLights = true;
     }
     glUniform1i(glGetUniformLocation(p.relight, "lightCount"), count);
     glUniform3fv(glGetUniformLocation(p.relight, "lightPos[0]"), count, positions.data());

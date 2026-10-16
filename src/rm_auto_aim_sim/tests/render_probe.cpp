@@ -296,7 +296,8 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     for (std::size_t i = 0; i < lit.size(); ++i)
       lamp_changed += std::abs(int(lit[i]) - int(output.rgb[i])) >= 3;
     if (lamp_changed < 100)
-      throw std::runtime_error("LED radiance/bloom control has no visible effect");
+      throw std::runtime_error("LED radiance/bloom control changed only " +
+                               std::to_string(lamp_changed) + " RGB components");
     std::cout << "PASS: async RGB orientation, HDR shader, capture metadata, estimated buffers "
               << metrics.gpu_estimate_mib << " MiB\n";
     return 0;
