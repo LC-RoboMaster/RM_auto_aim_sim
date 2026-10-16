@@ -112,12 +112,13 @@ void SensorWorker::Run() {
         last_time = capture_sim_time;
         if (completed) {
           ++frame_count;
-          metrics.latency_ms = (WallTime() - ready.capture_wall_time) * 1000.0;
+          const double capture_wall_time = ready.capture_wall_time;
           const auto publish_start = Clock::now();
           ready.wall_fps = last_fps;
           publish_(std::move(ready));
           metrics.publish_ms = std::chrono::duration<double, std::milli>(
               Clock::now() - publish_start).count();
+          metrics.latency_ms = (WallTime() - capture_wall_time) * 1000.0;
         }
         const auto now = Clock::now();
         const double elapsed = std::chrono::duration<double>(now - metric_start).count();

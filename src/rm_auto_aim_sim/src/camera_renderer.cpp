@@ -20,6 +20,12 @@ using Clock = std::chrono::steady_clock;
 double Ms(Clock::time_point start, Clock::time_point end) {
   return std::chrono::duration<double, std::milli>(end - start).count();
 }
+void CheckGl(const char* stage) {
+  const GLenum error = glGetError();
+  if (error != GL_NO_ERROR)
+    throw std::runtime_error(std::string("Camera OpenGL error after ") + stage +
+                             ": " + std::to_string(static_cast<unsigned>(error)));
+}
 }  // namespace
 
 struct CameraRenderer::Async {
@@ -126,6 +132,7 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
                                  bool shader, bool shadows, double exposure, double bloom,
                                  double lamp_intensity, CameraMetrics& metrics) {
   if (!async_) async_ = std::make_unique<Async>(width_, height_);
+  while (glGetError() != GL_NO_ERROR) {}  // Isolate this frame's GL errors.
   bool completed = async_->Collect(ready, metrics);
   auto& slot = async_->slots[async_->write];
   if (slot.fence) {
@@ -140,9 +147,11 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   const auto render_begin = Clock::now();
   mjr_setBuffer(mjFB_OFFSCREEN, &context_);
   mjr_render({0, 0, width_, height_}, &scene_, &context_);
+  CheckGl("MuJoCo render");
   const auto k = ModelIntrinsics(model_, camera_id_, width_, height_);
   async_->pipeline.Process(scene_, context_, k.fx, k.fy, k.cx, k.cy,
                            exposure, bloom, lamp_intensity, shader);
+  CheckGl("HDR pipeline");
   metrics.render_ms = Ms(render_begin, Clock::now());
   metrics.gpu_estimate_mib = async_->pipeline.EstimatedMiB() +
                               3.0 * async_->bytes / (1024.0 * 1024.0);
@@ -156,8 +165,8 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   async_->pipeline.ReadPixelsToPbo(slot.pbo);
   slot.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   glFlush();
+  CheckGl("PBO readback");
   async_->write = (async_->write + 1) % async_->slots.size();
-  if (glGetError() != GL_NO_ERROR) throw std::runtime_error("Camera shader OpenGL error");
   return completed || async_->Collect(ready, metrics);
 }
 }  // namespace rm_auto_aim_sim

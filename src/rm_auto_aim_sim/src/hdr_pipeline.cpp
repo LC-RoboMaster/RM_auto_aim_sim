@@ -210,6 +210,12 @@ void Draw(GLuint fbo, int width, int height) {
   glViewport(0, 0, width, height);
   glDrawArrays(GL_TRIANGLES, 0, 3);
 }
+void Check(const char* pass) {
+  const GLenum error = glGetError();
+  if (error != GL_NO_ERROR)
+    throw std::runtime_error(std::string("HDR ") + pass + " GL error " +
+                             std::to_string(static_cast<unsigned>(error)));
+}
 }  // namespace
 
 struct HdrPipeline::Impl {
@@ -270,6 +276,7 @@ void HdrPipeline::Process(const mjvScene& scene, const mjrContext& context,
   glBindFramebuffer(GL_DRAW_FRAMEBUFFER, p.baseFbo);
   glBlitFramebuffer(0, 0, p.width, p.height, 0, 0, p.width, p.height,
                     GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+  Check("source blit");
   if (shader_enabled) {
     const auto& cam = scene.camera[0];
     glUseProgram(p.relight);
@@ -301,10 +308,12 @@ void HdrPipeline::Process(const mjvScene& scene, const mjrContext& context,
     glUniform3fv(glGetUniformLocation(p.relight, "lightColor[0]"), count, colors.data());
     glUniform1f(glGetUniformLocation(p.relight, "lampIntensity"), lamp_intensity);
     Draw(p.hdrFbo, p.width, p.height);
+    Check("relight");
 
     glUseProgram(p.downsample);
     BindTexture(p.downsample, "source", p.hdr, 0);
     Draw(p.blurFbo[0], p.bloomWidth, p.bloomHeight);
+    Check("bloom");
     glUseProgram(p.blurProgram);
     BindTexture(p.blurProgram, "source", p.blur[0], 0);
     glUniform2f(glGetUniformLocation(p.blurProgram, "direction"),
@@ -323,6 +332,13 @@ void HdrPipeline::Process(const mjvScene& scene, const mjrContext& context,
   glUniform1f(glGetUniformLocation(p.camera, "exposure"), exposure);
   glUniform1f(glGetUniformLocation(p.camera, "bloomStrength"), bloom);
   Draw(p.finalFbo, p.width, p.height);
+  Check("camera response");
+  // MuJoCo's next fixed-function scene draw shares this context.
+  glUseProgram(0);
+  glBindVertexArray(0);
+  glActiveTexture(GL_TEXTURE0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+  glEnable(GL_DEPTH_TEST);
 }
 
 void HdrPipeline::ReadPixelsToPbo(unsigned int pbo) const {
@@ -336,7 +352,7 @@ void HdrPipeline::ReadPixelsToPbo(unsigned int pbo) const {
 
 double HdrPipeline::EstimatedMiB() const {
   const auto& p = *impl_;
-  const double bytes = double(p.width) * p.height * (4 + 4 + 8 + 4) +
+  const double bytes = double(p.width) * p.height * (4 + 4 + 8 + 4 + 8) +
                        double(p.bloomWidth) * p.bloomHeight * 16;
   return bytes / (1024.0 * 1024.0);
 }
