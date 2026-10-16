@@ -223,9 +223,12 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     auto config = aim::Config::Load(config_path);
     aim::Engine engine(config);
     auto settings = engine.Target()->Settings();
-    settings.center = {-2, 0, 0};
+    // Put the facing plate near the camera so the generated preview exposes
+    // the LED core, its halo, and the surrounding material response.
+    settings.center = {-3, 0, 0};
     settings.h1 = settings.h2 = .99;
     settings.color = 0;
+    settings.light_whiteness = .45;
     engine.Target()->Configure(settings, engine.Data());
     aim::CameraRenderer renderer(engine.Model(), engine.CameraId(), config.camera_width,
                                  config.camera_height);
