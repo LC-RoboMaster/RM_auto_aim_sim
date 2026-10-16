@@ -149,6 +149,9 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   mjv_updateScene(model_, data, &option_, nullptr, &camera_, mjCAT_ALL, &scene_);
   SetBlackSky(&scene_, capture.state.dark_sky);
   scene_.flags[mjRND_SHADOW] = shadows;
+  if (shadows)
+    for (int i = 0; i < scene_.nlight; ++i)
+      if (!scene_.lights[i].headlight) scene_.lights[i].castshadow = 1;
   metrics.scene_ms = Ms(scene_begin, Clock::now());
   const auto render_begin = Clock::now();
   glBeginQuery(GL_TIME_ELAPSED, slot.timer);

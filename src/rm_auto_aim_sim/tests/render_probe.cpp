@@ -268,6 +268,25 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     image << "P6\n" << output.width << ' ' << output.height << "\n255\n";
     image.write(reinterpret_cast<const char*>(output.rgb.data()), output.rgb.size());
     if (!image) throw std::runtime_error("Cannot save Shader probe image");
+    const auto lit = output.rgb;
+    bool got_unlit = false;
+    for (int attempt = 0; attempt < 40; ++attempt) {
+      aim::CameraFrame frame;
+      frame.state.time = 200 + attempt;
+      if (renderer.RenderAsync(engine.Data(), std::move(frame), output,
+                               true, false, 1.0, 0.0, 0.0, metrics) &&
+          output.state.time >= 200) {
+        got_unlit = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (!got_unlit) throw std::runtime_error("Cannot capture no-lamp baseline");
+    std::size_t lamp_changed = 0;
+    for (std::size_t i = 0; i < lit.size(); ++i)
+      lamp_changed += std::abs(int(lit[i]) - int(output.rgb[i])) >= 3;
+    if (lamp_changed < 100)
+      throw std::runtime_error("LED radiance/bloom control has no visible effect");
     std::cout << "PASS: async RGB orientation, HDR shader, capture metadata, estimated buffers "
               << metrics.gpu_estimate_mib << " MiB\n";
     return 0;
