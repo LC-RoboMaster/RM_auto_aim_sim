@@ -11,7 +11,7 @@ void RosBridge::Attach(CommandMailbox&, const StateFrame&) {}
 
 void RosBridge::PublishState(const StateFrame&, const std::vector<HitEvent>&) {}
 
-void RosBridge::PublishCamera(const CameraFrame&) {}
+void RosBridge::PublishCamera(CameraFrame&&) {}
 
 bool RosBridge::Running() const { return true; }
 }  // namespace rm_auto_aim_sim

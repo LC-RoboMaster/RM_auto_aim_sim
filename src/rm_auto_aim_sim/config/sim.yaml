@@ -9,6 +9,11 @@ rm_auto_aim_sim:
     camera_fps: 120.0
     camera_fovy_deg: 60.0
     camera_msaa: 0
+    camera_shader: true
+    camera_exposure: 1.0
+    camera_bloom: 0.9
+    camera_lamp_intensity: 8.0
+    camera_shadows: false
     state_hz: 150.0
     physics_timestep: 0.0005
     manual_translation_speed: 2.0
@@ -77,7 +82,7 @@ rm_auto_aim_sim:
     target_angular_speed: 0.0
     target_initial_angle: 0.0
     target_color: "blue"
-    lighting_brightness: 0.135
+    lighting_brightness: 0.03
     # Rectified camera K in pixels. Set true to replace FOV with these values.
     camera_use_intrinsics: true
     camera_fx: 1576.115395
@@ -89,5 +94,5 @@ rm_auto_aim_sim:
 
     # Binary-image armor testing: black background and brighter grayscale LED colours.
     dark_sky: true
-    environment_albedo: 1.0
-    target_light_whiteness: 0.45
+    environment_albedo: 0.0
+    target_light_whiteness: 0.65

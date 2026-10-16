@@ -9,6 +9,8 @@ class Simulate;
 }
 
 namespace rm_auto_aim_sim {
+class SensorWorker;
+void BindViewerSensor(SensorWorker* worker);
 
 // These hooks run under Simulate::mtx. The official free-camera path is untouched.
 void BindViewerEngine(Engine* engine);

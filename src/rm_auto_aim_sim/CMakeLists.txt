@@ -46,8 +46,9 @@ add_library(aim_core src/config.cpp src/engine.cpp src/projectile_pool.cpp src/t
 target_include_directories(aim_core PUBLIC include)
 target_link_libraries(aim_core PUBLIC mujoco_pip yaml-cpp Threads::Threads)
 target_compile_options(aim_core PRIVATE -Wall -Wextra -Wpedantic)
-add_library(aim_camera src/camera_renderer.cpp)
-target_link_libraries(aim_camera PUBLIC aim_core)
+find_package(OpenGL REQUIRED)
+add_library(aim_camera src/camera_renderer.cpp src/hdr_pipeline.cpp)
+target_link_libraries(aim_camera PUBLIC aim_core OpenGL::GL)
 
 if(BUILD_VIEWER)
   if(GLFW_LIBRARY AND GLFW_INCLUDE_DIR)

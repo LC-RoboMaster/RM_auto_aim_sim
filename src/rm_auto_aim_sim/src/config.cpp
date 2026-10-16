@@ -77,6 +77,12 @@ void Config::Validate() const {
   require(camera_fovy_deg > 1 && camera_fovy_deg < 179 && std::isfinite(camera_fovy_deg),
           "camera_fovy_deg must be in (1,179)");
   require(camera_msaa >= 0 && camera_msaa <= 8, "camera_msaa must be in [0,8]");
+  require(positive(camera_exposure) && camera_exposure <= 8 &&
+              std::isfinite(camera_bloom) && camera_bloom >= 0 && camera_bloom <= 2 &&
+              std::isfinite(camera_lamp_intensity) && camera_lamp_intensity >= 0 &&
+              camera_lamp_intensity <= 20,
+          "camera shader exposure/bloom/lamp settings invalid");
+  require(!camera_shader || camera_msaa == 0, "camera_shader requires camera_msaa: 0");
   require(!camera_use_intrinsics ||
               (positive(camera_fx) && positive(camera_fy) && std::isfinite(camera_cx) &&
                std::isfinite(camera_cy) && camera_cx >= 0 && camera_cx < camera_width &&

@@ -39,7 +39,7 @@
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake ninja-build libglfw3-dev libyaml-cpp-dev \
-  libgl1-mesa-dev python3-colcon-common-extensions \
+  libgl1-mesa-dev libegl1-mesa-dev python3-colcon-common-extensions \
   ros-humble-rclcpp ros-humble-rclpy ros-humble-sensor-msgs \
   ros-humble-geometry-msgs ros-humble-rosgraph-msgs ros-humble-std-msgs \
   ros-humble-tf2-msgs ros-humble-tf2-ros ros-humble-rqt-image-view
@@ -89,6 +89,33 @@ ros2 run rm_auto_aim_sim rm_auto_aim_sim \
 ```
 
 ## 3. 手动操作
+
+### 相机画质和性能
+
+`config/sim.yaml` 默认启用相机 Shader。右侧 **CAMERA / LIGHT** 可实时切换
+`Shader camera` 和 `Shadows`，并调整曝光、Bloom 和灯条强度；关闭 Shader 时输出
+MuJoCo 原生画面，方便在同一场景比较。灯条局部照明采用深度重建和 GGX
+高光，发光部分进入 RGBA16F 缓冲，Bloom 在四分之一分辨率处理，最后固定曝光
+并转换成 RGB8。场景纹理和基础环境光仍由 MuJoCo 绘制。
+
+默认相机外观面向漫水二值化：`Black sky` 开启，`Floor / scene color` 为 0，
+`Scene light` 为 0.03，使天空、地面及障碍物接近黑色；灯条白色混合为 0.65，
+HDR 亮度为 8，光晕强度为 0.9。右侧滑条可分别调背景亮度、灯条灰度、
+灯条发光和光晕；`Exposure` 会改变整张图像。点击 `Restore YAML look` 可恢复
+`config/sim.yaml` 中的外观参数。Shader 作用于 `/image_raw`；3D viewer 的
+`Gimbal` 视角仍是 MuJoCo 原生预览，查看算法输入请打开图像话题。
+
+右侧 **PERFORMANCE** 显示实测相机 FPS、采集到发布延迟、各 CPU 提交阶段
+耗时、进程 CPU/RSS 和估算的相机缓冲区大小。CPU 100% 表示占满一个逻辑核；
+`GPU render` 是显卡计时查询的场景和 Shader 绘制时间，`GPU transfer` 是显卡写入
+PBO 的时间，`PBO map/copy` 是 CPU 取回缓冲的时间；`Render submit` 是 CPU
+提交耗时。打开 `Show perf plots` 可查看最近
+15 秒的阶段耗时和进程负载。异步 PBO 队列最多 3 帧，忙时丢弃新采集，防止
+图像越积越旧；消息保留各自采集时刻的仿真时间、内参和位姿。
+
+在相同配置、场景和显卡上，分别切换两种模式并记录 FPS 与延迟，才能判断
+该设备上的性能差异。无显示器时可运行
+`MUJOCO_GL=egl python src/rm_auto_aim_sim/tests/run_render_test.py --library build/libaim_render_probe.so`。
 
 右侧 `Auto Aim` 菜单的 `Control mode` 选择 `MANUAL`，`View` 选择 `Gimbal`。原生 Rendering 菜单也能选 `gimbal_camera`，`Esc` 返回自由相机。
 

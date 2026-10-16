@@ -212,7 +212,7 @@ void RosBridge::PublishState(const StateFrame& state, const std::vector<HitEvent
   }
 }
 
-void RosBridge::PublishCamera(const CameraFrame& frame) {
+void RosBridge::PublishCamera(CameraFrame&& frame) {
   const auto& config = impl_->config;
   sensor_msgs::msg::Image image;
   image.header.stamp = SimStamp(frame.state.time);
@@ -222,7 +222,7 @@ void RosBridge::PublishCamera(const CameraFrame& frame) {
   image.encoding = "rgb8";
   image.is_bigendian = false;
   image.step = frame.width * 3;
-  image.data = frame.rgb;
+  image.data = std::move(frame.rgb);
   sensor_msgs::msg::CameraInfo info;
   info.header = image.header;
   info.width = frame.width;
