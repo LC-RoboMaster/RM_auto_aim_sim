@@ -270,6 +270,7 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
       std::this_thread::sleep_for(std::chrono::milliseconds(2));
     }
     if (!got_shader || !std::isfinite(metrics.gpu_ms) || metrics.gpu_ms <= 0 ||
+        !std::isfinite(metrics.gpu_transfer_ms) || metrics.gpu_transfer_ms <= 0 ||
         output.rgb.size() != native.rgb.size() ||
         output.capture_wall_time != 1000 + (output.state.time - 100))
       throw std::runtime_error("Shader output or PBO capture metadata mismatched");

@@ -100,7 +100,8 @@ MuJoCo 原生画面，方便在同一场景比较。灯条局部照明采用深�
 
 右侧 **PERFORMANCE** 显示实测相机 FPS、采集到发布延迟、各 CPU 提交阶段
 耗时、进程 CPU/RSS 和估算的相机缓冲区大小。CPU 100% 表示占满一个逻辑核；
-`GPU render` 是显卡计时查询的场景和 Shader 绘制时间；`Render submit` 是 CPU
+`GPU render` 是显卡计时查询的场景和 Shader 绘制时间，`GPU transfer` 是显卡写入
+PBO 的时间，`PBO map/copy` 是 CPU 取回缓冲的时间；`Render submit` 是 CPU
 提交耗时。打开 `Show perf plots` 可查看最近
 15 秒的阶段耗时和进程负载。异步 PBO 队列最多 3 帧，忙时丢弃新采集，防止
 图像越积越旧；消息保留各自采集时刻的仿真时间、内参和位姿。

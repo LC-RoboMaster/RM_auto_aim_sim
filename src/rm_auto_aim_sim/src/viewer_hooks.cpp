@@ -36,7 +36,7 @@ struct Sample {
 };
 std::deque<Sample> history;
 struct PerfSample {
-  double time, render, readback, publish, cpu, rss;
+  double time, render, transfer, readback, publish, cpu, rss;
 };
 std::deque<PerfSample> perf_history;
 double last_perf_sample = -1;
@@ -152,9 +152,11 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   std::strcpy(rate_figure.linename[0], "cumulative %");
   Figure(timing_figure, "Camera stages [ms]", "seconds ago");
   std::strcpy(timing_figure.linename[0], "GPU render");
-  std::strcpy(timing_figure.linename[1], "readback");
-  std::strcpy(timing_figure.linename[2], "ROS publish");
+  std::strcpy(timing_figure.linename[1], "GPU transfer");
+  std::strcpy(timing_figure.linename[2], "PBO map/copy");
+  std::strcpy(timing_figure.linename[3], "ROS publish");
   Color(timing_figure.linergb[2], .6f, .7f, .95f);
+  Color(timing_figure.linergb[3], .9f, .45f, .75f);
   Figure(process_figure, "Process load", "seconds ago");
   std::strcpy(process_figure.linename[0], "CPU % (one core)");
   std::strcpy(process_figure.linename[1], "RSS MiB");
@@ -207,7 +209,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SECTION, "PERFORMANCE", 1},
       {mjITEM_STATIC, "Camera", 1, nullptr, "FPS 0\nLatency 0 ms\nDropped 0"},
       {mjITEM_STATIC, "Stages", 1, nullptr, "Snapshot 0 ms\nScene 0 ms\nGPU render 0 ms\nRender submit 0 ms"},
-      {mjITEM_STATIC, "Output", 1, nullptr, "Readback 0 ms\nROS publish 0 ms"},
+      {mjITEM_STATIC, "Output", 1, nullptr, "GPU transfer 0 ms\nPBO map/copy 0 ms\nROS publish 0 ms"},
       {mjITEM_STATIC, "Process", 1, nullptr, "CPU 0% (100%=1 core)\nRSS 0 MiB\nRender buffers ~0 MiB"},
       {mjITEM_CHECKINT, "Show perf plots", 1, &performance_plots_ui},
       {mjITEM_END}};
@@ -343,8 +345,9 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
     std::snprintf(stages.name[2], mjMAXUINAME, "GPU render %.2f ms", m.gpu_ms);
     std::snprintf(stages.name[3], mjMAXUINAME, "Render submit %.2f ms", m.render_ms);
     auto& output = sim->ui1.sect[performance_section].item[2].multi;
-    std::snprintf(output.name[0], mjMAXUINAME, "Readback %.2f ms", m.readback_ms);
-    std::snprintf(output.name[1], mjMAXUINAME, "ROS publish %.2f ms", m.publish_ms);
+    std::snprintf(output.name[0], mjMAXUINAME, "GPU transfer %.2f ms", m.gpu_transfer_ms);
+    std::snprintf(output.name[1], mjMAXUINAME, "PBO map/copy %.2f ms", m.readback_ms);
+    std::snprintf(output.name[2], mjMAXUINAME, "ROS publish %.2f ms", m.publish_ms);
     auto& process = sim->ui1.sect[performance_section].item[3].multi;
     std::snprintf(process.name[0], mjMAXUINAME, "CPU %.1f%% (100%%=1 core)", m.cpu_percent);
     std::snprintf(process.name[1], mjMAXUINAME, "RSS %.1f MiB", m.rss_mib);
@@ -355,7 +358,7 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
     const double wall = std::chrono::duration<double>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
     if (last_perf_sample < 0 || wall - last_perf_sample >= .2) {
-      perf_history.push_back({wall, m.gpu_ms, m.readback_ms, m.publish_ms,
+      perf_history.push_back({wall, m.gpu_ms, m.gpu_transfer_ms, m.readback_ms, m.publish_ms,
                               m.cpu_percent, m.rss_mib});
       last_perf_sample = wall;
       if (perf_history.size() > 75) perf_history.pop_front();
@@ -425,19 +428,19 @@ void DrawViewerPlots(mujoco::Simulate* sim, mjrRect viewport) {
     double timing_max = 1, process_max = 10;
     for (std::size_t i = 0; i < perf_history.size(); ++i) {
       const auto& s = perf_history[i];
-      const double values[2][3] = {{s.render, s.readback, s.publish}, {s.cpu, s.rss, 0}};
-      for (int line = 0; line < 3; ++line) {
+      const double values[4] = {s.render, s.transfer, s.readback, s.publish};
+      for (int line = 0; line < 4; ++line) {
         timing_figure.linedata[line][2 * i] = s.time - now;
-        timing_figure.linedata[line][2 * i + 1] = values[0][line];
+        timing_figure.linedata[line][2 * i + 1] = values[line];
       }
       for (int line = 0; line < 2; ++line) {
         process_figure.linedata[line][2 * i] = s.time - now;
-        process_figure.linedata[line][2 * i + 1] = values[1][line];
+        process_figure.linedata[line][2 * i + 1] = line == 0 ? s.cpu : s.rss;
       }
-      timing_max = std::max({timing_max, s.render, s.readback, s.publish});
+      timing_max = std::max({timing_max, s.render, s.transfer, s.readback, s.publish});
       process_max = std::max({process_max, s.cpu, s.rss});
     }
-    for (int i = 0; i < 3; ++i) timing_figure.linepnt[i] = perf_history.size();
+    for (int i = 0; i < 4; ++i) timing_figure.linepnt[i] = perf_history.size();
     for (int i = 0; i < 2; ++i) process_figure.linepnt[i] = perf_history.size();
     for (auto* fig : {&timing_figure, &process_figure}) {
       fig->range[0][0] = -15;

@@ -32,6 +32,7 @@ struct CameraRenderer::Async {
   struct Slot {
     GLuint pbo = 0;
     GLuint timer = 0;
+    GLuint transfer_timer = 0;
     GLsync fence = nullptr;
     CameraFrame frame;
   };
@@ -44,6 +45,7 @@ struct CameraRenderer::Async {
     for (auto& slot : slots) {
       glGenBuffers(1, &slot.pbo);
       glGenQueries(1, &slot.timer);
+      glGenQueries(1, &slot.transfer_timer);
       glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
       glBufferData(GL_PIXEL_PACK_BUFFER, bytes, nullptr, GL_STREAM_READ);
     }
@@ -53,6 +55,7 @@ struct CameraRenderer::Async {
     for (auto& slot : slots) {
       if (slot.fence) glDeleteSync(slot.fence);
       glDeleteQueries(1, &slot.timer);
+      glDeleteQueries(1, &slot.transfer_timer);
       glDeleteBuffers(1, &slot.pbo);
     }
   }
@@ -65,6 +68,8 @@ struct CameraRenderer::Async {
     GLuint64 gpu_nanoseconds = 0;
     glGetQueryObjectui64v(slot.timer, GL_QUERY_RESULT, &gpu_nanoseconds);
     metrics.gpu_ms = gpu_nanoseconds / 1e6;
+    glGetQueryObjectui64v(slot.transfer_timer, GL_QUERY_RESULT, &gpu_nanoseconds);
+    metrics.gpu_transfer_ms = gpu_nanoseconds / 1e6;
     const auto begin = Clock::now();
     glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
     void* pixels = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, bytes, GL_MAP_READ_BIT);
@@ -173,7 +178,9 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
   capture.cx = k.cx;
   capture.cy = k.cy;
   slot.frame = std::move(capture);
+  glBeginQuery(GL_TIME_ELAPSED, slot.transfer_timer);
   async_->pipeline.ReadPixelsToPbo(slot.pbo);
+  glEndQuery(GL_TIME_ELAPSED);
   slot.fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
   glFlush();
   CheckGl("PBO readback");
