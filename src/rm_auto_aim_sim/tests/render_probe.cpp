@@ -3,6 +3,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
+#include <thread>
 
 #include "rm_auto_aim_sim/camera_renderer.hpp"
 #include "rm_auto_aim_sim/engine.hpp"
@@ -212,6 +213,65 @@ extern "C" int RunDarkRenderProbe(const char* config_path, const char* output_pa
     return 0;
   } catch (const std::exception& error) {
     std::cerr << "DARK RENDER FAIL: " << error.what() << '\n';
+    return 1;
+  }
+}
+
+extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_path) {
+  namespace aim = rm_auto_aim_sim;
+  try {
+    auto config = aim::Config::Load(config_path);
+    aim::Engine engine(config);
+    aim::CameraRenderer renderer(engine.Model(), engine.CameraId(), config.camera_width,
+                                 config.camera_height);
+    aim::CameraFrame native, output;
+    renderer.Render(engine.Data(), native);
+    aim::CameraMetrics metrics;
+    auto capture = [&](bool shader) {
+      for (int attempt = 0; attempt < 30; ++attempt) {
+        aim::CameraFrame frame;
+        frame.state.time = 17.0 + attempt * .01;
+        frame.capture_wall_time = 123.0 + attempt;
+        if (renderer.RenderAsync(engine.Data(), std::move(frame), output,
+                                 shader, false, 1.0, .55, 4.0, metrics)) return;
+        std::this_thread::sleep_for(std::chrono::milliseconds(2));
+      }
+      throw std::runtime_error("PBO queue did not complete a camera frame");
+    };
+    capture(false);
+    if (output.rgb != native.rgb || output.fx != native.fx || output.fy != native.fy)
+      throw std::runtime_error("Native async readback changed RGB orientation or intrinsics");
+    // Drain the previously submitted native captures; then look for a shader
+    // frame with its own capture timestamp (queue contents must not be mixed).
+    bool got_shader = false;
+    for (int attempt = 0; attempt < 40; ++attempt) {
+      aim::CameraFrame frame;
+      frame.state.time = 100 + attempt;
+      frame.capture_wall_time = 1000 + attempt;
+      if (renderer.RenderAsync(engine.Data(), std::move(frame), output,
+                               true, false, 1.0, .7, 5.0, metrics) &&
+          output.state.time >= 100) {
+        got_shader = true;
+        break;
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(2));
+    }
+    if (!got_shader || output.rgb.size() != native.rgb.size() ||
+        output.capture_wall_time != 1000 + (output.state.time - 100))
+      throw std::runtime_error("Shader output or PBO capture metadata mismatched");
+    std::size_t changed = 0;
+    for (std::size_t i = 0; i < output.rgb.size(); ++i)
+      changed += output.rgb[i] != native.rgb[i];
+    if (changed < 1000) throw std::runtime_error("HDR shader did not change camera image");
+    std::ofstream image(output_path, std::ios::binary);
+    image << "P6\n" << output.width << ' ' << output.height << "\n255\n";
+    image.write(reinterpret_cast<const char*>(output.rgb.data()), output.rgb.size());
+    if (!image) throw std::runtime_error("Cannot save Shader probe image");
+    std::cout << "PASS: async RGB orientation, HDR shader, capture metadata, estimated buffers "
+              << metrics.gpu_estimate_mib << " MiB\n";
+    return 0;
+  } catch (const std::exception& error) {
+    std::cerr << "SHADER RENDER FAIL: " << error.what() << '\n';
     return 1;
   }
 }

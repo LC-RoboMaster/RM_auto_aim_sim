@@ -47,7 +47,16 @@ struct CameraFrame {
   double focal_length = 0;  // Compatibility alias for fx.
   double fx = 0, fy = 0, cx = 0, cy = 0;
   double wall_fps = 0;
+  double capture_wall_time = 0;
   std::vector<std::uint8_t> rgb;
+};
+
+struct CameraMetrics {
+  double fps = 0;
+  double snapshot_ms = 0, scene_ms = 0, render_ms = 0, readback_ms = 0, publish_ms = 0;
+  double latency_ms = 0, cpu_percent = 0, rss_mib = 0;
+  double gpu_estimate_mib = 0;
+  std::uint64_t dropped_frames = 0;
 };
 
 struct ManualInput {

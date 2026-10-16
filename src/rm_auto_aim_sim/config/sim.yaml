@@ -9,6 +9,11 @@ rm_auto_aim_sim:
     camera_fps: 120.0
     camera_fovy_deg: 60.0
     camera_msaa: 0
+    camera_shader: true
+    camera_exposure: 1.0
+    camera_bloom: 0.55
+    camera_lamp_intensity: 4.0
+    camera_shadows: false
     state_hz: 150.0
     physics_timestep: 0.0005
     manual_translation_speed: 2.0

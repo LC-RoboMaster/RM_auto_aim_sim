@@ -1,0 +1,28 @@
+name: Camera and simulation checks
+on:
+  push:
+    branches: [feat/hdr-shader-telemetry]
+  pull_request:
+jobs:
+  linux:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++ libglfw3-dev libyaml-cpp-dev libgl1-mesa-dev libegl1-mesa-dev
+          python3 -m pip install mujoco==3.3.7
+      - name: Build
+        run: cmake -S src/rm_auto_aim_sim -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DENABLE_ROS2=OFF -DCONDA_PYTHON=$(which python3)
+      - name: Compile and run checks
+        run: |
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+          MUJOCO_GL=egl python3 src/rm_auto_aim_sim/tests/run_render_test.py --library build/libaim_render_probe.so --output build/camera_probe.ppm
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: camera-probe-images
+          path: build/camera_probe.ppm*
+          if-no-files-found: ignore

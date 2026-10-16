@@ -39,7 +39,7 @@
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake ninja-build libglfw3-dev libyaml-cpp-dev \
-  libgl1-mesa-dev python3-colcon-common-extensions \
+  libgl1-mesa-dev libegl1-mesa-dev python3-colcon-common-extensions \
   ros-humble-rclcpp ros-humble-rclpy ros-humble-sensor-msgs \
   ros-humble-geometry-msgs ros-humble-rosgraph-msgs ros-humble-std-msgs \
   ros-humble-tf2-msgs ros-humble-tf2-ros ros-humble-rqt-image-view
@@ -89,6 +89,24 @@ ros2 run rm_auto_aim_sim rm_auto_aim_sim \
 ```
 
 ## 3. 手动操作
+
+### 相机画质和性能
+
+`config/sim.yaml` 默认启用相机 Shader。右侧 **CAMERA / LIGHT** 可实时切换
+`Shader camera` 和 `Shadows`，并调整曝光、Bloom 和灯条强度；关闭 Shader 时输出
+MuJoCo 原生画面，方便在同一场景比较。灯条局部照明采用深度重建和 GGX
+高光，发光部分进入 RGBA16F 缓冲，Bloom 在四分之一分辨率处理，最后固定曝光
+并转换成 RGB8。场景纹理和基础环境光仍由 MuJoCo 绘制。
+
+右侧 **PERFORMANCE** 显示实测相机 FPS、采集到发布延迟、各 CPU 提交阶段
+耗时、进程 CPU/RSS 和估算的相机缓冲区大小。CPU 100% 表示占满一个逻辑核；
+`Render submit` 不包含 GPU 异步执行时间。打开 `Show perf plots` 可查看最近
+15 秒的阶段耗时和进程负载。异步 PBO 队列最多 3 帧，忙时丢弃新采集，防止
+图像越积越旧；消息保留各自采集时刻的仿真时间、内参和位姿。
+
+在相同配置、场景和显卡上，分别切换两种模式并记录 FPS 与延迟，才能判断
+该设备上的性能差异。无显示器时可运行
+`MUJOCO_GL=egl python src/rm_auto_aim_sim/tests/run_render_test.py --library build/libaim_render_probe.so`。
 
 右侧 `Auto Aim` 菜单的 `Control mode` 选择 `MANUAL`，`View` 选择 `Gimbal`。原生 Rendering 菜单也能选 `gimbal_camera`，`Esc` 返回自由相机。
 

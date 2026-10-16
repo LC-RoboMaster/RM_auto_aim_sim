@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <thread>
 
 #include "rm_auto_aim_sim/engine.hpp"
@@ -15,12 +16,15 @@ namespace rm_auto_aim_sim {
 class SensorWorker {
  public:
   using Snapshot = std::function<StateFrame(mjModel*, mjData*)>;
-  using Publish = std::function<void(const CameraFrame&)>;
+  using Publish = std::function<void(CameraFrame&&)>;
   SensorWorker(const Engine& engine, Snapshot snapshot, Publish publish);
   ~SensorWorker();
   void Start();
   void Stop();
   bool Failed() const { return failed_.load(); }
+  void SetRendering(bool shader, bool shadows, double exposure, double bloom,
+                    double lamp_intensity);
+  CameraMetrics Metrics() const;
 
  private:
   void Run();
@@ -33,6 +37,10 @@ class SensorWorker {
   GLFWwindow* window_ = nullptr;
   std::thread thread_;
   std::atomic_bool stop_{false}, failed_{false};
+  std::atomic_bool shader_{true}, shadows_{false};
+  std::atomic<double> exposure_{1}, bloom_{.55}, lamp_intensity_{4};
+  mutable std::mutex metrics_mutex_;
+  CameraMetrics metrics_;
 };
 
 }  // namespace rm_auto_aim_sim

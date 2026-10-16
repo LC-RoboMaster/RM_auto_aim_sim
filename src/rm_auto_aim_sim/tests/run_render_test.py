@@ -27,5 +27,9 @@ if result == 0:
     library.RunDarkRenderProbe.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     library.RunDarkRenderProbe.restype = ctypes.c_int
     result = library.RunDarkRenderProbe(os.fsencode(args.config), os.fsencode(args.output + ".dark"))
+if result == 0:
+    library.RunShaderRenderProbe.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+    library.RunShaderRenderProbe.restype = ctypes.c_int
+    result = library.RunShaderRenderProbe(os.fsencode(args.config), os.fsencode(args.output + ".shader.ppm"))
 context.free()
 raise SystemExit(result)

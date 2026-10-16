@@ -4,30 +4,42 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <cstring>
 #include <deque>
 
 #include "glfw_adapter.h"
+#include "rm_auto_aim_sim/sensor_worker.hpp"
 #include "simulate.h"
 
 namespace rm_auto_aim_sim {
 namespace {
 Engine* engine = nullptr;
+SensorWorker* sensor = nullptr;
 int mode_ui = 0, view_ui = 0, direction_ui = 0, plots_ui = 1;
 int control_section = -1, target_section = -1, camera_section = -1, stats_section = -1;
+int performance_section = -1, performance_plots_ui = 0;
 TargetSettings target_ui;
 CameraIntrinsics camera_ui{};
 double speed_ui = 0, brightness_ui = 1, albedo_ui = 1, lamp_white_ui = 0;
 int dark_sky_ui = 0;
+int shader_ui = 1, shadows_ui = 0;
+double exposure_ui = 1, bloom_ui = .55, lamp_intensity_ui = 4;
 bool camera_was_fixed = false;
 mjvCamera saved_free_camera{};
 mjvFigure angles_figure{}, rate_figure{};
+mjvFigure timing_figure{}, process_figure{};
 struct Sample {
   double time, pitch, yaw, rate;
 };
 std::deque<Sample> history;
+struct PerfSample {
+  double time, render, readback, publish, cpu, rss;
+};
+std::deque<PerfSample> perf_history;
+double last_perf_sample = -1;
 double last_sample = -1;
 std::uint64_t epoch = 0;
 
@@ -106,6 +118,7 @@ void Error(mujoco::Simulate* sim, const char* message) {
 }  // namespace
 
 void BindViewerEngine(Engine* value) { engine = value; }
+void BindViewerSensor(SensorWorker* value) { sensor = value; }
 bool HasViewerEngine() { return engine != nullptr; }
 
 void AddViewerMenu(mujoco::Simulate* sim) {
@@ -121,7 +134,15 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   albedo_ui = engine->Environment().Albedo();
   dark_sky_ui = engine->Environment().DarkSky() ? 1 : 0;
   lamp_white_ui = target_ui.light_whiteness;
+  const auto& camera_config = engine->GetConfig();
+  shader_ui = camera_config.camera_shader;
+  shadows_ui = camera_config.camera_shadows;
+  exposure_ui = camera_config.camera_exposure;
+  bloom_ui = camera_config.camera_bloom;
+  lamp_intensity_ui = camera_config.camera_lamp_intensity;
   history.clear();
+  perf_history.clear();
+  last_perf_sample = -1;
   last_sample = -1;
   epoch = engine->State().statistics_epoch;
   Figure(angles_figure, "Gimbal angles [rad]", "seconds ago");
@@ -129,6 +150,14 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   std::strcpy(angles_figure.linename[1], "yaw");
   Figure(rate_figure, "Armor hit rate [%]", "seconds ago");
   std::strcpy(rate_figure.linename[0], "cumulative %");
+  Figure(timing_figure, "Camera stages [ms]", "seconds ago");
+  std::strcpy(timing_figure.linename[0], "render submit");
+  std::strcpy(timing_figure.linename[1], "readback");
+  std::strcpy(timing_figure.linename[2], "ROS publish");
+  Color(timing_figure.linergb[2], .6f, .7f, .95f);
+  Figure(process_figure, "Process load", "seconds ago");
+  std::strcpy(process_figure.linename[0], "CPU % (one core)");
+  std::strcpy(process_figure.linename[1], "RSS MiB");
   // The laboratory controls replace the native right-hand joint sliders. The
   // native left panel stays available with Tab for debugging/solver settings.
   sim->ui1.nsect = 0;
@@ -136,6 +165,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   target_section = 1;
   camera_section = 2;
   stats_section = 3;
+  performance_section = 4;
   mjuiDef definition[] = {
       {mjITEM_SECTION, "AUTO AIM LAB", 1},
       {mjITEM_SELECT, "Control mode", 1, &mode_ui, "MANUAL\nAUTO (ROS2)"},
@@ -163,12 +193,23 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SLIDERNUM, "Lamp whiteness", 1, &lamp_white_ui, "0 1"},
       {mjITEM_STATIC, "Camera model", 1, nullptr, "Rectified pinhole RGB\nK alters projection"},
       {mjITEM_STATIC, "Status", 1, nullptr, "Ready"},
+      {mjITEM_CHECKINT, "Shader camera", 1, &shader_ui},
+      {mjITEM_CHECKINT, "Shadows", 1, &shadows_ui},
+      {mjITEM_SLIDERNUM, "Exposure", 1, &exposure_ui, "0.1 8"},
+      {mjITEM_SLIDERNUM, "Bloom", 1, &bloom_ui, "0 2"},
+      {mjITEM_SLIDERNUM, "LED intensity", 1, &lamp_intensity_ui, "0 20"},
       {mjITEM_SECTION, "HIT STATISTICS", 1},
       {mjITEM_STATIC, "Session", 1, nullptr, "Fired 0\nArmor hits 0\nHit rate 0.00%"},
       {mjITEM_STATIC, "Plate 0/1/2/3", 1, nullptr, "0 / 0 / 0 / 0"},
       {mjITEM_STATIC, "Pool", 1, nullptr, "Active 0\nDropped 0"},
       {mjITEM_BUTTON, "Reset statistics", 1},
       {mjITEM_CHECKINT, "Show charts", 1, &plots_ui},
+      {mjITEM_SECTION, "PERFORMANCE", 1},
+      {mjITEM_STATIC, "Camera", 1, nullptr, "FPS 0\nLatency 0 ms\nDropped 0"},
+      {mjITEM_STATIC, "Stages", 1, nullptr, "Snapshot 0 ms\nScene 0 ms\nRender submit 0 ms"},
+      {mjITEM_STATIC, "Output", 1, nullptr, "Readback 0 ms\nROS publish 0 ms"},
+      {mjITEM_STATIC, "Process", 1, nullptr, "CPU 0% (100%=1 core)\nRSS 0 MiB\nRender buffers ~0 MiB"},
+      {mjITEM_CHECKINT, "Show perf plots", 1, &performance_plots_ui},
       {mjITEM_END}};
   mjui_add(&sim->ui1, definition);
   Theme(sim->ui0);
@@ -202,6 +243,9 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
         engine->Target()->SetLightWhiteness(lamp_white_ui);
         target_ui.light_whiteness = lamp_white_ui;
       }
+      if (item->itemid >= 9 && item->itemid <= 13 && sensor)
+        sensor->SetRendering(shader_ui != 0, shadows_ui != 0, exposure_ui,
+                             bloom_ui, lamp_intensity_ui);
     } else if (item->sectionid == stats_section) {
       if (item->itemid == 3) engine->ResetStatistics();
     } else
@@ -286,6 +330,36 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
   std::snprintf(pool.name[0], mjMAXUINAME, "Active %d", state.active_projectiles);
   std::snprintf(pool.name[1], mjMAXUINAME, "Dropped %llu",
                 (unsigned long long)state.pool_exhausted_count);
+  if (sensor) {
+    const auto m = sensor->Metrics();
+    auto& camera = sim->ui1.sect[performance_section].item[0].multi;
+    std::snprintf(camera.name[0], mjMAXUINAME, "FPS %.1f", m.fps);
+    std::snprintf(camera.name[1], mjMAXUINAME, "Latency %.1f ms", m.latency_ms);
+    std::snprintf(camera.name[2], mjMAXUINAME, "Dropped %llu",
+                  (unsigned long long)m.dropped_frames);
+    auto& stages = sim->ui1.sect[performance_section].item[1].multi;
+    std::snprintf(stages.name[0], mjMAXUINAME, "Snapshot %.2f ms", m.snapshot_ms);
+    std::snprintf(stages.name[1], mjMAXUINAME, "Scene %.2f ms", m.scene_ms);
+    std::snprintf(stages.name[2], mjMAXUINAME, "Render submit %.2f ms", m.render_ms);
+    auto& output = sim->ui1.sect[performance_section].item[2].multi;
+    std::snprintf(output.name[0], mjMAXUINAME, "Readback %.2f ms", m.readback_ms);
+    std::snprintf(output.name[1], mjMAXUINAME, "ROS publish %.2f ms", m.publish_ms);
+    auto& process = sim->ui1.sect[performance_section].item[3].multi;
+    std::snprintf(process.name[0], mjMAXUINAME, "CPU %.1f%% (100%%=1 core)", m.cpu_percent);
+    std::snprintf(process.name[1], mjMAXUINAME, "RSS %.1f MiB", m.rss_mib);
+    std::snprintf(process.name[2], mjMAXUINAME, "Render buffers ~%.1f MiB", m.gpu_estimate_mib);
+    for (int i = 0; i < 4; ++i)
+      mjui_update(performance_section, i, &sim->ui1, &sim->uistate,
+                  &sim->platform_ui->mjr_context());
+    const double wall = std::chrono::duration<double>(
+        std::chrono::steady_clock::now().time_since_epoch()).count();
+    if (last_perf_sample < 0 || wall - last_perf_sample >= .2) {
+      perf_history.push_back({wall, m.render_ms, m.readback_ms, m.publish_ms,
+                              m.cpu_percent, m.rss_mib});
+      last_perf_sample = wall;
+      if (perf_history.size() > 75) perf_history.pop_front();
+    }
+  }
   // UI fields being edited retain their staging values. State text refreshes at display rate.
   mjui_update(control_section, 2, &sim->ui1, &sim->uistate, &sim->platform_ui->mjr_context());
   for (int i = 0; i < 3; ++i)
@@ -315,8 +389,8 @@ void ApplyViewerEnvironment(mujoco::Simulate* sim) {
 }
 
 void DrawViewerPlots(mujoco::Simulate* sim, mjrRect viewport) {
-  if (!engine || !plots_ui || history.empty() || viewport.width < 420 || viewport.height < 360)
-    return;
+  if (!engine || viewport.width < 420 || viewport.height < 360) return;
+  if (plots_ui && !history.empty()) {
   // Figures are populated only by the viewer thread; history is bounded to 15 seconds at 20 Hz.
   const double now = history.back().time;
   double low = -.5, high = .5;
@@ -344,6 +418,41 @@ void DrawViewerPlots(mujoco::Simulate* sim, mjrRect viewport) {
   const mjrRect bottom{viewport.left + 12, viewport.bottom + 12, width, height};
   mjr_figure(top, &angles_figure, &sim->platform_ui->mjr_context());
   mjr_figure(bottom, &rate_figure, &sim->platform_ui->mjr_context());
+  }
+  if (performance_plots_ui && !perf_history.empty()) {
+    const double now = perf_history.back().time;
+    double timing_max = 1, process_max = 10;
+    for (std::size_t i = 0; i < perf_history.size(); ++i) {
+      const auto& s = perf_history[i];
+      const double values[2][3] = {{s.render, s.readback, s.publish}, {s.cpu, s.rss, 0}};
+      for (int line = 0; line < 3; ++line) {
+        timing_figure.linedata[line][2 * i] = s.time - now;
+        timing_figure.linedata[line][2 * i + 1] = values[0][line];
+      }
+      for (int line = 0; line < 2; ++line) {
+        process_figure.linedata[line][2 * i] = s.time - now;
+        process_figure.linedata[line][2 * i + 1] = values[1][line];
+      }
+      timing_max = std::max({timing_max, s.render, s.readback, s.publish});
+      process_max = std::max({process_max, s.cpu, s.rss});
+    }
+    for (int i = 0; i < 3; ++i) timing_figure.linepnt[i] = perf_history.size();
+    for (int i = 0; i < 2; ++i) process_figure.linepnt[i] = perf_history.size();
+    for (auto* fig : {&timing_figure, &process_figure}) {
+      fig->range[0][0] = -15;
+      fig->range[0][1] = 0;
+      fig->range[1][0] = 0;
+    }
+    timing_figure.range[1][1] = timing_max * 1.15;
+    process_figure.range[1][1] = process_max * 1.15;
+    const int width = std::min(360, viewport.width / 2);
+    const int height = std::min(175, viewport.height / 4);
+    const int left = viewport.left + viewport.width - width - 12;
+    mjr_figure({left, viewport.bottom + 12 + height + 8, width, height},
+               &timing_figure, &sim->platform_ui->mjr_context());
+    mjr_figure({left, viewport.bottom + 12, width, height},
+               &process_figure, &sim->platform_ui->mjr_context());
+  }
 }
 void StepFromViewer() {
   if (engine) engine->Step();

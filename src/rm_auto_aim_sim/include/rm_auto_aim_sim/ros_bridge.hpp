@@ -13,7 +13,7 @@ class RosBridge {
   ~RosBridge();
   void Attach(CommandMailbox& mailbox, const StateFrame& initial_state);
   void PublishState(const StateFrame& state, const std::vector<HitEvent>& hits);
-  void PublishCamera(const CameraFrame& frame);
+  void PublishCamera(CameraFrame&& frame);
   bool Running() const;
 
  private:

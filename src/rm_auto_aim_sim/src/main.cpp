@@ -57,7 +57,8 @@ int main(int argc, char** argv) {
             mj_copyData(destination, render_model, engine->Data());
             return engine->State();
           },
-          [&](const aim::CameraFrame& frame) { bridge.PublishCamera(frame); });
+          [&](aim::CameraFrame&& frame) { bridge.PublishCamera(std::move(frame)); });
+      aim::BindViewerSensor(sensor.get());
       sensor->Start();
     }
     // The official rendering loop owns the main thread. All physics changes share its mutex.
@@ -115,6 +116,7 @@ int main(int argc, char** argv) {
     sim->RenderLoop();
     physics.join();
     if (sensor) sensor->Stop();
+    aim::BindViewerSensor(nullptr);
     const auto final_state = engine->State();
     std::cout << "[auto_aim] exit sim_time=" << final_state.time << " yaw=" << final_state.yaw
               << " pitch=" << final_state.pitch << " shots=" << final_state.shot_count
