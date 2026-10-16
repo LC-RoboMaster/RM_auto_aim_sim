@@ -291,15 +291,17 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     for (std::size_t i = 0; i < output.rgb.size(); ++i)
       changed += output.rgb[i] != native.rgb[i];
     if (changed < 1000) throw std::runtime_error("HDR shader did not change camera image");
-    for (int row : {5, output.height - 6})
-      for (int col : {5, output.width - 6})
-        for (int ch = 0; ch < 3; ++ch)
-          if (output.rgb[(row * output.width + col) * 3 + ch] > 3)
-            throw std::runtime_error("Shader camera sky/floor is not black");
     std::ofstream image(output_path, std::ios::binary);
     image << "P6\n" << output.width << ' ' << output.height << "\n255\n";
     image.write(reinterpret_cast<const char*>(output.rgb.data()), output.rgb.size());
     if (!image) throw std::runtime_error("Cannot save Shader probe image");
+    for (int row : {5, output.height - 6})
+      for (int col : {5, output.width - 6})
+        for (int ch = 0; ch < 3; ++ch)
+          if (output.rgb[(row * output.width + col) * 3 + ch] > 3)
+            throw std::runtime_error("Shader camera sky/floor is not black at " +
+                                     std::to_string(col) + "," + std::to_string(row) +
+                                     ": " + std::to_string(output.rgb[(row * output.width + col) * 3 + ch]));
     const auto lit = output.rgb;
     bool got_unlit = false;
     for (int attempt = 0; attempt < 40; ++attempt) {

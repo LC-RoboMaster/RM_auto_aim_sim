@@ -58,6 +58,12 @@ float smithG(float nDotX, float roughness) {
 }
 void main() {
   vec3 encoded = texture(baseColor, uv).rgb;
+  // A zero-albedo floor or disabled sky must stay black in the detector image.
+  // The subsequent image-space bloom can still spread over these pixels.
+  if (max(max(encoded.r, encoded.g), encoded.b) <= 3.0 / 255.0) {
+    outColor = vec4(0.0, 0.0, 0.0, 1.0);
+    return;
+  }
   float depth = texture(sceneDepth, uv).r;
   if (depth <= 0.0) { outColor = vec4(pow(encoded, vec3(2.2)), 1.0); return; }
   vec3 p = worldPosition(depth);
