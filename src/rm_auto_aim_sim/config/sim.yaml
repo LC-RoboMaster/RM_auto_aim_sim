@@ -11,12 +11,13 @@ rm_auto_aim_sim:
     initial_view: "orbit"          # UI: Camera view；orbit 自由观察，gimbal 云台第一人称。
     show_charts: true              # UI: Show charts；启动时显示云台角度和命中率曲线。
     show_perf_plots: false         # UI: Show perf plots；启动时显示阶段耗时和 CPU/RSS 曲线。
+    viewer_max_fps: 30.0           # viewer 帧率上限 [0,240] Hz，降低与传感器争抢 GPU；0 不额外限速。
 
     # ── 2. 相机采集与标定 ──────────────────────────────────────────
     camera_enabled: true           # 是否启动独立 RGB 相机线程；不影响 viewer 三维窗口。
     camera_width: 1280             # 输出宽度 [16,4096] px；修改尺寸时同时检查主点范围。
     camera_height: 1024            # 输出高度 [16,4096] px。
-    camera_fps: 200.0              # 请求采集频率 (0,500] Hz；实际 FPS 取决于渲染与 DDS。
+    camera_fps: 150.0              # 请求真实图像采集率 (0,500] Hz；目标 150，不重复旧帧补频率。
     camera_msaa: 0                 # 离屏 MSAA 请求值 [0,8]；启用 Shader 时必须为 0。
     camera_use_intrinsics: true    # true 使用下面的 K；false 按垂直 FOV 计算对称、居中内参。
     camera_fovy_deg: 60.0          # 垂直视场角 (1,179) 度；仅 camera_use_intrinsics=false 时生效。

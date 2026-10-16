@@ -122,10 +122,14 @@ extern "C" int RunLabRenderProbe(const char* config_path, const char* output_pat
     engine.SetBrightness(.4);
     engine.CopyRenderSettings(copy);
     mj_copyData(data, copy, engine.Data());
-    mj_forward(copy, data);
     {
       rm_auto_aim_sim::CameraRenderer worker(copy, engine.CameraId(), 640, 480);
       worker.Render(data, frame);
+      const auto copied_rgb = frame.rgb;
+      mj_forward(copy, data);
+      worker.Render(data, frame);
+      if (frame.rgb != copied_rgb)
+        throw std::runtime_error("Copied snapshot needs a redundant physics forward pass");
       if (pixels().first < 5 || std::abs(frame.fy - 850) > 1e-4 || std::abs(frame.cx - 300) > 1e-4)
         throw std::runtime_error("Worker snapshot did not observe UI edits");
     }

@@ -35,6 +35,7 @@ struct CameraRenderer::Async {
     GLuint transfer_timer = 0;
     GLsync fence = nullptr;
     CameraFrame frame;
+    Clock::time_point submitted;
   };
   HdrPipeline pipeline;
   std::array<Slot, 3> slots;
@@ -80,20 +81,28 @@ struct CameraRenderer::Async {
     if (result == GL_WAIT_FAILED) throw std::runtime_error("Camera PBO fence wait failed");
     GLuint64 gpu_nanoseconds = 0;
     glGetQueryObjectui64v(slot.timer, GL_QUERY_RESULT, &gpu_nanoseconds);
-    metrics.gpu_ms = gpu_nanoseconds / 1e6;
+    const double gpu_ms = gpu_nanoseconds / 1e6;
     glGetQueryObjectui64v(slot.transfer_timer, GL_QUERY_RESULT, &gpu_nanoseconds);
-    metrics.gpu_transfer_ms = gpu_nanoseconds / 1e6;
+    const double transfer_ms = gpu_nanoseconds / 1e6;
+    // Some software drivers return an invalid startup timer result. GPU work
+    // for this slot cannot exceed its wall-clock age; do not display such a
+    // value as a real bottleneck or include it in benchmark averages.
+    metrics.gpu_timer_valid = gpu_ms + transfer_ms <= Ms(slot.submitted, Clock::now()) * 2 + 1;
+    metrics.gpu_ms = metrics.gpu_timer_valid ? gpu_ms : 0;
+    metrics.gpu_transfer_ms = metrics.gpu_timer_valid ? transfer_ms : 0;
     const auto begin = Clock::now();
     glBindBuffer(GL_PIXEL_PACK_BUFFER, slot.pbo);
     void* pixels = glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, bytes, GL_MAP_READ_BIT);
     if (!pixels) throw std::runtime_error("Camera PBO mapping failed");
-    slot.frame.rgb.resize(bytes);
-    std::memcpy(slot.frame.rgb.data(), pixels, bytes);
+    auto recycled = std::move(ready.rgb);
+    recycled.resize(bytes);
+    std::memcpy(recycled.data(), pixels, bytes);
     glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
     glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
     glDeleteSync(slot.fence);
     slot.fence = nullptr;
     ready = std::move(slot.frame);
+    ready.rgb = std::move(recycled);
     read = (read + 1) % slots.size();
     metrics.readback_ms = Ms(begin, Clock::now());
     return true;
@@ -177,6 +186,7 @@ bool CameraRenderer::RenderAsync(mjData* data, CameraFrame capture, CameraFrame&
       if (!scene_.lights[i].headlight) scene_.lights[i].castshadow = 1;
   metrics.scene_ms = Ms(scene_begin, Clock::now());
   const auto render_begin = Clock::now();
+  slot.submitted = render_begin;
   glBeginQuery(GL_TIME_ELAPSED, slot.timer);
   mjr_setBuffer(mjFB_OFFSCREEN, &context_);
   mjr_render({0, 0, width_, height_}, &scene_, &context_);

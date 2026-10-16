@@ -6,6 +6,7 @@
 #include <thread>
 
 #include "rm_auto_aim_sim/engine.hpp"
+#include "rm_auto_aim_sim/frame_publisher.hpp"
 
 struct GLFWwindow;
 
@@ -21,7 +22,7 @@ class SensorWorker {
   ~SensorWorker();
   void Start();
   void Stop();
-  bool Failed() const { return failed_.load(); }
+  bool Failed() const { return failed_.load() || publisher_.Failed(); }
   void SetRendering(bool shader, bool shadows, double exposure, double bloom,
                     double lamp_intensity);
   CameraMetrics Metrics() const;
@@ -31,7 +32,7 @@ class SensorWorker {
   Config config_;
   int camera_id_;
   Snapshot snapshot_;
-  Publish publish_;
+  FramePublisher publisher_;
   mjModel* model_ = nullptr;
   mjData* data_ = nullptr;
   GLFWwindow* window_ = nullptr;

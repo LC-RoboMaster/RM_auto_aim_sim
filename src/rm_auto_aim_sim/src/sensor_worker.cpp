@@ -32,7 +32,7 @@ SensorWorker::SensorWorker(const Engine& engine, Snapshot snapshot, Publish publ
     : config_(engine.GetConfig()),
       camera_id_(engine.CameraId()),
       snapshot_(std::move(snapshot)),
-      publish_(std::move(publish)) {
+      publisher_(std::move(publish)) {
   SetRendering(config_.camera_shader, config_.camera_shadows, config_.camera_exposure,
                config_.camera_bloom, config_.camera_lamp_intensity);
   try {
@@ -61,7 +61,10 @@ SensorWorker::~SensorWorker() {
   mj_deleteModel(model_);
 }
 
-void SensorWorker::Start() { thread_ = std::thread(&SensorWorker::Run, this); }
+void SensorWorker::Start() {
+  publisher_.Start();
+  thread_ = std::thread(&SensorWorker::Run, this);
+}
 void SensorWorker::SetRendering(bool shader, bool shadows, double exposure, double bloom,
                                 double lamp_intensity) {
   shader_.store(shader);
@@ -72,12 +75,19 @@ void SensorWorker::SetRendering(bool shader, bool shadows, double exposure, doub
 }
 CameraMetrics SensorWorker::Metrics() const {
   const std::lock_guard<std::mutex> lock(metrics_mutex_);
-  return metrics_;
+  auto result = metrics_;
+  const auto published = publisher_.Metrics();
+  result.fps = published.fps;
+  result.publish_ms = published.publish_ms;
+  result.latency_ms = published.latency_ms;
+  result.publish_dropped_frames = published.dropped;
+  return result;
 }
 
 void SensorWorker::Stop() {
   stop_.store(true);
   if (thread_.joinable()) thread_.join();
+  publisher_.Stop();
 }
 
 void SensorWorker::Run() {
@@ -97,7 +107,7 @@ void SensorWorker::Run() {
     double last_fps = 0;
     auto cpu_start = deadline;
     std::clock_t process_start = std::clock();
-    while (!stop_.load()) {
+    while (!stop_.load() && !publisher_.Failed()) {
       const auto snapshot_start = Clock::now();
       frame.state =
           snapshot_(model_, data_);  // Short physics mutex hold; GPU render runs unlocked.
@@ -105,9 +115,11 @@ void SensorWorker::Run() {
           std::chrono::duration<double, std::milli>(Clock::now() - snapshot_start).count();
       bool completed = false;
       if (frame.state.time != last_time) {
-        mj_forward(model_, data_);
+        // The snapshot includes all poses computed by Engine::Step/Configure.
+        // Re-running mj_forward here repeats collision/constraint dynamics.
         frame.capture_wall_time = WallTime();
         const double capture_sim_time = frame.state.time;
+        if (capture_sim_time < last_time) publisher_.DiscardPending();
         completed =
             renderer.RenderAsync(data_, std::move(frame), ready, shader_.load(), shadows_.load(),
                                  exposure_.load(), bloom_.load(), lamp_intensity_.load(), metrics);
@@ -119,21 +131,19 @@ void SensorWorker::Run() {
       }
       if (completed) {
         ++frame_count;
-        const double capture_wall_time = ready.capture_wall_time;
-        const auto publish_start = Clock::now();
         ready.wall_fps = last_fps;
-        publish_(std::move(ready));
-        metrics.publish_ms =
-            std::chrono::duration<double, std::milli>(Clock::now() - publish_start).count();
-        metrics.latency_ms = (WallTime() - capture_wall_time) * 1000.0;
+        if (!publisher_.Submit(ready)) break;
       }
       const auto now = Clock::now();
       const double elapsed = std::chrono::duration<double>(now - metric_start).count();
       if (elapsed >= 1.0) {
         last_fps = frame_count / elapsed;
-        metrics.fps = last_fps;
-        std::cout << "[camera] actual " << last_fps << " FPS, requested " << config_.camera_fps
-                  << '\n';
+        metrics.capture_fps = last_fps;
+        const auto published = publisher_.Metrics();
+        std::cout << "[camera] capture " << last_fps << " FPS, published " << published.fps
+                  << " FPS, requested " << config_.camera_fps
+                  << ", publish " << published.publish_ms << " ms, queue drops "
+                  << published.dropped << '\n';
         frame_count = 0;
         metric_start = now;
       }

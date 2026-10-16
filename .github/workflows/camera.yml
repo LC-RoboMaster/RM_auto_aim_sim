@@ -60,3 +60,22 @@ jobs:
             -DENABLE_ROS2=ON -DBUILD_TESTING=OFF -DCONDA_PYTHON=/usr/bin/python3
           cmake --build build_ros --parallel 2
           build_ros/rm_auto_aim_sim --help
+      - name: Full-size ROS image transport smoke test
+        shell: bash
+        env:
+          ROS_DOMAIN_ID: '73'
+          ROS_LOCALHOST_ONLY: '1'
+          RMW_IMPLEMENTATION: rmw_fastrtps_cpp
+        run: |
+          source /opt/ros/humble/setup.bash
+          export FASTRTPS_DEFAULT_PROFILES_FILE="$PWD/src/rm_auto_aim_sim/config/fastdds_camera.xml"
+          build_ros/camera_rate_probe --publish --seconds 6 --warmup 2 --min-fps 10 > build_ros/publish.log 2>&1 &
+          publisher_pid=$!
+          trap 'kill "$publisher_pid" 2>/dev/null || true' EXIT
+          build_ros/camera_rate_probe --topic /sim/benchmark/image_raw --seconds 5 --warmup 2 --min-fps 10 | tee build_ros/receive.log
+          wait "$publisher_pid"
+          cat build_ros/publish.log
+          echo '### 1280x1024 RGB8 transport only (150 Hz request; smoke threshold 10 Hz)' >> "$GITHUB_STEP_SUMMARY"
+          echo '```text' >> "$GITHUB_STEP_SUMMARY"
+          cat build_ros/publish.log build_ros/receive.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

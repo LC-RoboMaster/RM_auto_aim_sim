@@ -22,5 +22,7 @@ void UpdateViewerInput(mujoco::Simulate* sim);
 void StepFromViewer();
 void ApplyViewerEnvironment(mujoco::Simulate* sim);
 void DrawViewerPlots(mujoco::Simulate* sim, mjrRect viewport);
+// Called outside the physics mutex after each viewer frame.
+void WaitForViewerFrame();
 
 }  // namespace rm_auto_aim_sim

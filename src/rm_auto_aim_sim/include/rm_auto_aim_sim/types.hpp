@@ -52,12 +52,15 @@ struct CameraFrame {
 };
 
 struct CameraMetrics {
+  bool gpu_timer_valid = false;
   double fps = 0;
+  double capture_fps = 0;
   double snapshot_ms = 0, scene_ms = 0, render_ms = 0, gpu_ms = 0;
   double gpu_transfer_ms = 0, readback_ms = 0, publish_ms = 0;
   double latency_ms = 0, cpu_percent = 0, rss_mib = 0;
   double gpu_estimate_mib = 0;
   std::uint64_t dropped_frames = 0;
+  std::uint64_t publish_dropped_frames = 0;
 };
 
 struct ManualInput {

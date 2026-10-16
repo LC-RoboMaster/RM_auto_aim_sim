@@ -7,6 +7,10 @@
 `src/rm_auto_aim_sim/config/sim.yaml` 已集中列出全部参数并逐项添加中文注释。
 相机光照在第 3 组；UI 修改只影响当前运行，不自动写回 YAML。
 
+**[150 FPS 发布与测速指南](src/rm_auto_aim_sim/docs/PERFORMANCE.md)**：
+当前默认 1280×1024 / 150 FPS 请求，viewer 预览上限 30 FPS；采集和 ROS 发布分线程。
+用 `ros2 run rm_auto_aim_sim camera_rate_probe --seconds 10 --min-fps 145` 验收实际接收率。
+
 ## v0.2：RMUC 场地、旋转装甲目标与测试面板
 
 新增四板靶标（r1/r2、h1/h2、XYZ、15° 上倾、红蓝切换、可调正反转）、
@@ -28,7 +32,7 @@
 - 保留官方 `simulate` 的观察、暂停、物理/可视化菜单，右侧增加 `Auto Aim` 菜单。
 - 手动平移云台底座、控制 pitch/yaw；切换自由观察相机和云台相机。
 - 自动模式订阅两个 `std_msgs/msg/Float64` 绝对角度命令；单位为**弧度**。
-- 独立 OpenGL 相机线程，默认 **640×480 / 120 FPS / RGB8**；配置支持 100、120、150 FPS。
+- 独立 OpenGL 相机线程，默认 **1280×1024 / 150 FPS / RGB8**；配置支持 100、120、150 FPS。
 - 发布同时间戳的 Image/CameraInfo、完整 TF、pitch/yaw、JointState 和 `/clock`。
 - 自动 Bool 连射和手动第一人称左键按住连射，共用发射调度器，默认 **15 Hz**。
 - 默认弹丸**直径 17 mm、速度 22 m/s、质量 3.2 g**，绿色自发光材质，重力和接触由 MuJoCo 求解。
@@ -105,14 +109,13 @@ MuJoCo 原生画面，方便在同一场景比较。灯条局部照明采用深�
 高光，发光部分进入 RGBA16F 缓冲，Bloom 在四分之一分辨率处理，最后固定曝光
 并转换成 RGB8。场景纹理和基础环境光仍由 MuJoCo 绘制。
 
-默认相机外观面向漫水二值化：`Black sky` 开启，`Floor / scene color` 为 0，
-`Scene light` 为 0.03，使天空、地面及障碍物接近黑色；灯条白色混合为 0.65，
-HDR 亮度为 8，光晕强度为 0.9。右侧滑条可分别调背景亮度、灯条灰度、
+配置保留当前用户调整的外观。漫水二值化需要黑背景时，可以开启 `Black sky`、
+将 `Floor / scene color` 设为 0、`Scene light` 设为 0.03。右侧滑条可分别调背景亮度、灯条灰度、
 灯条发光和光晕；`Exposure` 会改变整张图像。点击 `Restore YAML look` 可恢复
 `config/sim.yaml` 中的外观参数。Shader 作用于 `/image_raw`；3D viewer 的
 `Gimbal` 视角仍是 MuJoCo 原生预览，查看算法输入请打开图像话题。
 
-右侧 **PERFORMANCE** 显示实测相机 FPS、采集到发布延迟、各 CPU 提交阶段
+右侧 **PERFORMANCE** 分别显示采集 FPS、发布回调完成 FPS、采集到发布延迟、各 CPU 提交阶段
 耗时、进程 CPU/RSS 和估算的相机缓冲区大小。CPU 100% 表示占满一个逻辑核；
 `GPU render` 是显卡计时查询的场景和 Shader 绘制时间，`GPU transfer` 是显卡写入
 PBO 的时间，`PBO map/copy` 是 CPU 取回缓冲的时间；`Render submit` 是 CPU
@@ -121,7 +124,7 @@ PBO 的时间，`PBO map/copy` 是 CPU 取回缓冲的时间；`Render submit` �
 图像越积越旧；消息保留各自采集时刻的仿真时间、内参和位姿。
 暂停后仍会收完已提交的 GPU 图像，队列收空后不重复采集同一仿真时刻；FPS
 随后归零，CPU/RSS 继续更新。检测到重置或历史回退导致采集时间倒退时，先丢弃
-队列中的旧图像，再提交新时间线的图像；这些丢弃也计入 `Dropped`。
+队列中的旧图像，再提交新时间线的图像。GPU 和发布队列的丢弃分别计数。
 
 在相同配置、场景和显卡上，分别切换两种模式并记录 FPS 与延迟，才能判断
 该设备上的性能差异。无显示器时可运行
@@ -206,7 +209,7 @@ flowchart TD
 
 ## 6. 性能与扩展
 
-相机先复制物理状态再释放锁，GPU 渲染和 DDS 发布均在物理锁外执行。相机持有自己的 mjModel/mjData、mjvScene 和离屏 framebuffer；复用读回缓冲，落后时跳过采集而不累计延迟。实际采样时刻落在物理步上，帧间仿真时间可能略有离散。
+相机先复制物理状态再释放锁，GPU 渲染和 DDS 发布均在物理锁外执行；DDS 在独立发布线程，不阻塞相机。相机持有自己的 mjModel/mjData、mjvScene 和离屏 framebuffer；复用读回缓冲，落后时跳过采集而不累计延迟。实际采样时刻落在物理步上，帧间仿真时间可能略有离散。
 
 物理默认步长 0.5 ms，22 m/s 每步移动 11 mm，小于弹丸直径。MuJoCo 接触仍是离散检测；未来加入很薄、高速移动的靶标时，需要减小步长或增加扫掠检测，不能直接把当前首次接触事件当成最终比赛命中结果。
 

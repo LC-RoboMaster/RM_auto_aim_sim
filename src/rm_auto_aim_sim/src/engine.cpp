@@ -273,7 +273,9 @@ void Engine::Step() {
   pool_->BeforeStep(data_);
   if (target_) target_->Apply(data_);
   ApplyGimbalPose();
-  mj_forward(model_, data_);  // Muzzle pose must match this step's commanded axes.
+  // Only the muzzle pose is needed before mj_step, which evaluates full
+  // dynamics itself. Avoid a redundant collision/constraint solve each step.
+  mj_kinematics(model_, data_);
   if (fire) {
     if (!was_firing_) next_shot_time_ = data_->time;
     if (data_->time + 1e-10 >= next_shot_time_) {

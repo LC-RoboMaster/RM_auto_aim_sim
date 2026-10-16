@@ -4,6 +4,9 @@
 光照、目标、控制、弹丸、模型、TF、话题分组。每个参数都有中文注释；所有
 `config_fields.def` 中声明的参数都在该文件中显式列出。
 
+性能优先默认请求 150 FPS、viewer 上限 30 FPS；`viewer_max_fps` 只影响预览。
+采集/发布/接收三种频率的区别和测速步骤见 [PERFORMANCE.md](PERFORMANCE.md)。
+
 `config_fields.def` 的默认值仅在 YAML 未提供该字段时作为缺省值。示例 YAML
 保留当前相机标定和黑背景预设，部分值与缺省值不同；UI 使用实际加载的配置初始化。
 
@@ -63,8 +66,8 @@ Scene light、Black sky、Floor / scene color、LED white mix 同时作用于原
 灯条为白色混合 1 时红蓝色差消失。背景表面颜色为 0 时，增加场景灯光也不能
 恢复表面原色；需要一起提高 `environment_albedo`。
 
-当前文件保留黑背景预设：Scene light=0.03、Black sky=true、Floor / scene color=0、
-LED white mix=0.65、Shader=true、Exposure=1、Halo=0.9、LED HDR brightness=8。
+当前文件保留用户调整的外观，具体数值以 `sim.yaml` 为准。需要黑背景时可开启
+Black sky，将 Floor / scene color 设为 0、Scene light 设为 0.03，再调节灯条与光晕。
 
 ## 其他 UI 控件
 

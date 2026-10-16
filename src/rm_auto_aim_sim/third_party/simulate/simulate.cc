@@ -2907,6 +2907,7 @@ void Simulate::RenderLoop() {
       fps_ = frames_ / interval;
       frames_ = 0;
     }
+    rm_auto_aim_sim::WaitForViewerFrame();
   }
 
   const MutexLock lock(this->mtx);

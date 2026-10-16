@@ -237,6 +237,9 @@ void RosBridge::PublishCamera(CameraFrame&& frame) {
   info.p = {fx, 0, cx, 0, 0, fy, cy, 0, 0, 0, 1, 0};
   impl_->camera_info->publish(info);
   impl_->image->publish(image);
+  // rclcpp's const-reference publish has returned; reclaim the RGB allocation
+  // instead of freeing and zero-allocating a multi-megabyte vector every frame.
+  frame.rgb = std::move(image.data);
   std_msgs::msg::Float64 fps;
   fps.data = frame.wall_fps;
   impl_->camera_fps->publish(fps);

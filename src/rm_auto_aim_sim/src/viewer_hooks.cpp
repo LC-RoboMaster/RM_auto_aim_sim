@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <deque>
+#include <thread>
 
 #include "glfw_adapter.h"
 #include "rm_auto_aim_sim/sensor_worker.hpp"
@@ -237,7 +238,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_BUTTON, "Reset statistics", 1},
       {mjITEM_CHECKINT, "Show charts", 1, &plots_ui},
       {mjITEM_SECTION, "PERFORMANCE", 1},
-      {mjITEM_STATIC, "Camera", 1, nullptr, "FPS 0\nLatency 0 ms\nDropped 0"},
+      {mjITEM_STATIC, "Camera", 1, nullptr, "Publish FPS 0\nCapture FPS 0\nLatency 0 ms\nGPU drops 0\nPublish drops 0"},
       {mjITEM_STATIC, "Stages", 1, nullptr, "Snapshot 0 ms\nScene 0 ms\nGPU render 0 ms\nRender submit 0 ms"},
       {mjITEM_STATIC, "Output", 1, nullptr, "GPU transfer 0 ms\nPBO map/copy 0 ms\nROS publish 0 ms"},
       {mjITEM_STATIC, "Process", 1, nullptr, "CPU 0% (100%=1 core)\nRSS 0 MiB\nRender buffers ~0 MiB"},
@@ -369,17 +370,22 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
   if (sensor) {
     const auto m = sensor->Metrics();
     auto& camera = sim->ui1.sect[performance_section].item[0].multi;
-    std::snprintf(camera.name[0], mjMAXUINAME, "FPS %.1f", m.fps);
-    std::snprintf(camera.name[1], mjMAXUINAME, "Latency %.1f ms", m.latency_ms);
-    std::snprintf(camera.name[2], mjMAXUINAME, "Dropped %llu",
+    std::snprintf(camera.name[0], mjMAXUINAME, "Publish FPS %.1f", m.fps);
+    std::snprintf(camera.name[1], mjMAXUINAME, "Capture FPS %.1f", m.capture_fps);
+    std::snprintf(camera.name[2], mjMAXUINAME, "Latency %.1f ms", m.latency_ms);
+    std::snprintf(camera.name[3], mjMAXUINAME, "GPU drops %llu",
                   (unsigned long long)m.dropped_frames);
+    std::snprintf(camera.name[4], mjMAXUINAME, "Publish drops %llu",
+                  (unsigned long long)m.publish_dropped_frames);
     auto& stages = sim->ui1.sect[performance_section].item[1].multi;
     std::snprintf(stages.name[0], mjMAXUINAME, "Snapshot %.2f ms", m.snapshot_ms);
     std::snprintf(stages.name[1], mjMAXUINAME, "Scene %.2f ms", m.scene_ms);
     std::snprintf(stages.name[2], mjMAXUINAME, "GPU render %.2f ms", m.gpu_ms);
+    if (!m.gpu_timer_valid) std::snprintf(stages.name[2], mjMAXUINAME, "GPU render n/a");
     std::snprintf(stages.name[3], mjMAXUINAME, "Render submit %.2f ms", m.render_ms);
     auto& output = sim->ui1.sect[performance_section].item[2].multi;
     std::snprintf(output.name[0], mjMAXUINAME, "GPU transfer %.2f ms", m.gpu_transfer_ms);
+    if (!m.gpu_timer_valid) std::snprintf(output.name[0], mjMAXUINAME, "GPU transfer n/a");
     std::snprintf(output.name[1], mjMAXUINAME, "PBO map/copy %.2f ms", m.readback_ms);
     std::snprintf(output.name[2], mjMAXUINAME, "ROS publish %.2f ms", m.publish_ms);
     auto& process = sim->ui1.sect[performance_section].item[3].multi;
@@ -494,5 +500,14 @@ void DrawViewerPlots(mujoco::Simulate* sim, mjrRect viewport) {
 }
 void StepFromViewer() {
   if (engine) engine->Step();
+}
+void WaitForViewerFrame() {
+  if (!engine || engine->GetConfig().viewer_max_fps == 0) return;
+  using Clock = std::chrono::steady_clock;
+  static auto deadline = Clock::now();
+  deadline += std::chrono::duration_cast<Clock::duration>(
+      std::chrono::duration<double>(1.0 / engine->GetConfig().viewer_max_fps));
+  if (deadline < Clock::now()) deadline = Clock::now();
+  std::this_thread::sleep_until(deadline);
 }
 }  // namespace rm_auto_aim_sim

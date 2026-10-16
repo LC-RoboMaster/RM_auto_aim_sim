@@ -46,6 +46,8 @@ void Config::Validate() const {
   auto positive = [&](double value) { return std::isfinite(value) && value > 0; };
   require(initial_mode == "manual" || initial_mode == "auto", "initial_mode: manual or auto");
   require(initial_view == "orbit" || initial_view == "gimbal", "initial_view: orbit or gimbal");
+  require(std::isfinite(viewer_max_fps) && viewer_max_fps >= 0 && viewer_max_fps <= 240,
+          "viewer_max_fps must be in [0,240]");
   require(
       camera_width >= 16 && camera_width <= 4096 && camera_height >= 16 && camera_height <= 4096,
       "camera dimensions must be in [16,4096]");

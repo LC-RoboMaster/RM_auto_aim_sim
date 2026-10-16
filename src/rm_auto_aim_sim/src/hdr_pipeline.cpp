@@ -315,6 +315,13 @@ void HdrPipeline::Process(const mjvScene& scene, const mjrContext& context,
     for (int i = 0; i < scene.ngeom && count < 16; ++i) {
       const auto& geom = scene.geoms[i];
       if (geom.emission < .5f || geom.rgba[3] < .5f) continue;
+      // Parked pool projectiles are at (10000,10000,100). They must not
+      // consume the 16-light budget or run GGX on every camera pixel.
+      const double dx = geom.pos[0] - cam.pos[0];
+      const double dy = geom.pos[1] - cam.pos[1];
+      const double dz = geom.pos[2] - cam.pos[2];
+      if (dx * dx + dy * dy + dz * dz >
+          4.0 * cam.frustum_far * cam.frustum_far) continue;
       for (int c = 0; c < 3; ++c) {
         positions[3 * count + c] = geom.pos[c];
         colors[3 * count + c] = geom.rgba[c] * geom.emission;
