@@ -1,0 +1,125 @@
+# 参数配置与 UI 对照
+
+集中配置文件是 [`../config/sim.yaml`](../config/sim.yaml)，已按场景/UI、相机标定、
+光照、目标、控制、弹丸、模型、TF、话题分组。每个参数都有中文注释；所有
+`config_fields.def` 中声明的参数都在该文件中显式列出。
+
+性能优先默认请求 150 FPS、viewer 上限 30 FPS；`viewer_max_fps` 只影响预览。
+采集/发布/接收三种频率的区别和测速步骤见 [PERFORMANCE.md](PERFORMANCE.md)。
+
+`config_fields.def` 的默认值仅在 YAML 未提供该字段时作为缺省值。示例 YAML
+保留当前相机标定和黑背景预设，部分值与缺省值不同；UI 使用实际加载的配置初始化。
+
+## 选择实际加载的配置
+
+从仓库根目录运行：
+
+```bash
+source /opt/ros/humble/setup.bash
+source install/setup.bash
+ros2 launch rm_auto_aim_sim sim.launch.py config:="$PWD/src/rm_auto_aim_sim/config/sim.yaml"
+```
+
+独立版可以使用：
+
+```bash
+build/standalone/rm_auto_aim_sim --config "$PWD/src/rm_auto_aim_sim/config/sim.yaml"
+```
+
+`scene_path` 和非空的 `field_xml` 相对所选 YAML 的目录解析。ROS2 launch 不指定
+`config` 时读取当前所 source 的安装目录中的配置；普通安装后修改源码 YAML
+需要重新构建/安装，显式传上述路径能避免读到旧副本。
+
+配置在启动时读取并校验，修改磁盘文件后需要重启。直接使用可执行文件时，
+`--ros-args -p camera_exposure:=1.5` 等 ROS 参数覆盖随后生效。参数声明为
+read-only，不支持用 `ros2 param set` 在运行中改值。
+
+UI 控件会实时改变当前场景或相机线程，**不会写回 YAML，也不会同步修改 ROS
+参数服务器显示的启动值**。`Restore YAML look` 恢复本次启动时读取的相机外观及两种靶标混白值
+（包含 ROS 参数覆盖），不会重新读取磁盘，也不会恢复内参或目标位置。
+
+## CAMERA / LIGHT 的对应关系
+
+下表范围来自 C++ 校验；曝光的 UI 滑条范围是 0.1～8，YAML 允许任意大于 0 且
+不超过 8 的有限值。倍率均为仿真渲染参数，不是经过标定的物理照度或相机曝光时间。
+
+| UI 名称 | YAML 参数 | 范围 / 单位 | 效果与生效条件 |
+|---|---|---|---|
+| fx / fy [px] | `camera_fx`、`camera_fy` | >0，像素 | 启动时需 `camera_use_intrinsics: true`；UI 修改后点 Apply intrinsics |
+| cx / cy [px] | `camera_cx`、`camera_cy` | [0,width)、[0,height)，像素 | 与实际投影、CameraInfo 同步；像素原点在左上 |
+| Scene light | `lighting_brightness` | [0,3] | 缩放场景基础灯光和头灯，不关闭灯条自发光 |
+| Black sky | `dark_sky` | bool | true 关闭天空盒和雾，背景变黑 |
+| Floor / scene color | `environment_albedo` | [0,1] | 静态环境表面颜色和高光倍率，0 为黑色，1 恢复原色 |
+| Shader camera | `camera_shader` | bool | 控制独立 RGB 的 HDR 补光、光晕、曝光和色调映射；要求 `camera_msaa: 0` |
+| Shadows | `camera_shadows` | bool | 独立 RGB 的基础光源阴影开关；原生/Shader 两种模式均可用 |
+| Exposure | `camera_exposure` | (0,8] | 整幅 RGB 固定曝光倍率，仅 Shader 模式生效 |
+| Halo strength | `camera_bloom` | [0,2] | HDR 光晕叠加强度，0 关闭叠加，仅 Shader 模式生效 |
+| LED HDR brightness | `camera_lamp_intensity` | [0,20] | 附加灯条补光和发光强度；0 仍保留 MuJoCo 原生灯条自发光，仅 Shader 模式生效 |
+
+Scene light、Black sky、Floor / scene color 以及各目标组的 LED white mix 同时作用于原生 viewer
+和独立相机。Shader、Shadows、Exposure、Halo、LED HDR brightness 只改变独立
+相机输出，原生 viewer 的 Gimbal 视角不会显示这套后处理。查看算法实际输入请
+订阅 YAML 的 `topic_image`，当前为 `/image_raw`。
+
+阴影开关控制 MuJoCo 基础光源的阴影；Shader 附加的 LED 补光没有独立的阴影贴图。
+灯条为白色混合 1 时红蓝色差消失。背景表面颜色为 0 时，增加场景灯光也不能
+恢复表面原色；需要一起提高 `environment_albedo`。
+
+当前文件保留用户调整的外观，具体数值以 `sim.yaml` 为准。需要黑背景时可开启
+Black sky，将 Floor / scene color 设为 0、Scene light 设为 0.03，再调节灯条与光晕。
+
+## 其他 UI 控件
+
+| UI 控件 | YAML 参数 | 说明 |
+|---|---|---|
+| Control mode | `initial_mode` | `manual` / `auto`，初始控制模式 |
+| Camera view | `initial_view` | `orbit` / `gimbal`，初始观察视角；不决定 RGB 相机位姿 |
+| Center XYZ [m] | `armor_x/y/z` | 旋转中心世界坐标，m |
+| r1 / r2 [m] | `armor_r1/r2` | 0/2、1/3 号相对板的两组半径，m |
+| h1 / h2 [m] | `armor_h1/h2` | 相对中心 Z 的两组装甲中心高度，m |
+| Color | `armor_color` | `red` / `blue` |
+| Speed [rad/s] + Direction | `armor_angular_speed` | 正数为绕 +Z 逆时针，负数为顺时针；UI 将绝对值与方向分开显示 |
+| Show charts | `show_charts` | 云台角度/命中率图的初始显示状态 |
+| Show perf plots | `show_perf_plots` | 性能图的初始显示状态 |
+
+`armor_tilt_deg` 对应 Normal up [deg]，控制装甲外法线上倾角；Geometry 同步显示。
+`armor_initial_angle` 对应 Heading [rad] 的启动值；Reset heading 是运行时将朝向置零的动作。
+Apply intrinsics、Restore YAML look、Reset statistics 等按钮属于动作，不对应持续数值。
+FPS、CPU、RSS、命中数等文本是实测输出，不是可调参数。
+
+## 参数完整性检查
+
+`configuration_contract` 随 CTest 运行：检查示例 YAML 与声明字段完全对应，拒绝
+重复/遗漏项，调用实际配置加载/校验，并检查内参、目标及环境参数进入 Engine。
+新增参数时需要同时补充 YAML 的数值与注释。参数拼写错误、非法范围和错误的
+启动视角会在启动时明确报错。
+
+### ROS 图像子弹可见度
+
+`camera_projectile_opacity` 对应 CAMERA / LIGHT → **ROS bullet opacity**，范围 `[0,1]`：0 完全隐藏、0.5 半透明、1 完全显示（默认）。原生相机与 Shader 相机均支持；透明度同时缩放 HDR 灯光贡献，0 时移除子弹几何及其阴影和光晕。桌面 viewer、弹道、碰撞和命中统计不受影响。UI 调整实时作用于后续采集帧，不写回 YAML；Restore YAML look 恢复启动值。修改 YAML 后重启生效。
+
+## 目标分类与旧配置迁移
+
+四板装甲板：**ARMOR (4 PLATES)**，统一使用 `armor_*`；前哨站：**OUTPOST (3 PLATES)**，使用 `outpost_*`。旧的 `target_*` YAML 和 ROS 启动参数仍作为对应 `armor_*` 的别名读取；同一字段同时写新旧名字会报错，防止覆盖顺序不明确。模型内部原来的 target_center / target_glow 名称保留，不影响自定义资产绑定。示例配置保留原有四板/光照数值，并在 (5,2,0) 新增前哨站；旧配置缺少 outpost_enabled 时默认不新增目标。
+
+| 前哨站 UI | YAML | 含义 |
+|---|---|---|
+| Center XYZ [m] | `outpost_x/y/z` | 旋转轴基准坐标，z 是参考地面高度 |
+| Diameter [m] | `outpost_diameter` | 板中心水平轨迹圆直径，默认 0.550 m |
+| Height 0/1/2 [m] | `outpost_h1/h2/h3` | 板中心相对地面高度，默认 1.114 / 1.216 / 1.318 m |
+| Plane / floor [deg] | `outpost_plane_angle_deg` | 数字面与地面夹角，默认 75°；正面法线朝外下方 15° |
+| Speed + Direction | `outpost_angular_speed` | rad/s；俯视 CCW 为正，CW 为负，0 停转 |
+| Heading [rad] | `outpost_initial_angle` | 初始方位；UI 可直接设当前方位或 Reset heading 归零 |
+| Color / LED white mix | `outpost_color` / `outpost_light_whiteness` | 独立红蓝颜色和混白比例 |
+
+0/1/2 号板俯视径向角依次为 θ、θ+120°、θ+240°。三个高度始终分别绑定相应板号，旋转不改变高度。此版本复用现有小装甲板网格和数字 2 贴图，尺寸未缩放。这里的高度指**装甲板中心**，并非下沿或灯条顶端。启用/禁用目标会改变模型拓扑，`armor_enabled` / `outpost_enabled` 在 YAML 修改并重启；其余上述控件可运行时调整，不自动保存。
+
+ARMOR 和 OUTPOST 的混白控件分别位于各自目标组；CAMERA / LIGHT 仅保留全局场景与相机设置。ARMOR 的 Normal up / Heading 也已可直接编辑。
+
+## 连续 yaw
+
+默认 `yaw_continuous: true`，AUTO AIM LAB → **Continuous yaw** 可实时切换。连续模式取消 yaw 机械限位，内部角度连续累积；ROS yaw 与 JointState.position 反馈归一化到 [-π,π]，到边界时数值跳变但姿态连续。例如从 +179° 指向 -179°，向正方向转 2°，不会绕回 358°。速度由真实小角增量计算，跨界时没有反馈速度尖峰。输入单位仍是 rad。
+
+`yaw_min` / `yaw_max` 只在 `yaw_continuous: false` 时限制转动，pitch 上下限始终生效。运行中关闭连续模式会将 yaw 映射到等价单圈角并限幅，丢弃当前 yaw 目标；AUTO 下后续命令继续按限位跟踪。
+
+命中统计中的 hits / hit_rate 为两种目标合计；`plate_hits[4]` 继续仅表示四板 ARMOR，新增 `outpost_plate_hits[3]` 表示前哨站。首次接触事件增加 `target_type`（armor/outpost/environment），`armor_index` 是该类目标内部板号。

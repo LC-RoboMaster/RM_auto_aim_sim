@@ -20,6 +20,7 @@ int main(int argc, char** argv) {
     Check(argc == 2, "Pass sim.yaml");
     auto config = aim::Config::Load(argv[1]);
     config.projectile_pool_size = 16;
+    config.yaw_continuous = false;  // This suite checks the optional hard-stop mode.
     aim::Engine engine(config);
     const auto initial = engine.State();
     mjtNum optical_rotation[9], muzzle_rotation[9];

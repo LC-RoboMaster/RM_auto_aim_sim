@@ -1,0 +1,33 @@
+<mujoco model="three_plate_outpost">
+  <worldbody>
+    <body name="outpost_center" mocap="true" pos="5 2 0">
+      <body name="outpost_rotor">
+        <joint name="outpost_spin" type="hinge" axis="0 0 1" limited="false" damping="0" />
+        <body name="outpost_0" pos="0.275 0 1.114" quat="0.991444861374 -0 0.13052619222 0">
+          <inertial pos="0 0 0" mass=".1" diaginertia=".0004 .0002 .0003" />
+          <geom name="outpost_0_small_armor" type="mesh" mesh="target_small_armor" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_0_small_armor_target" type="mesh" mesh="target_small_armor_target" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_0_small_armor_light_bar" type="mesh" mesh="target_small_armor_light_bar" pos="0 0 -.0625" material="outpost_glow" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_0_number" type="mesh" mesh="target_small_num2_plane" pos=".014 0 0" quat=".5 .5 .5 .5" material="target_sticker" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_hitbox_0" type="box" pos=".004 0 0" size=".012 .0675 .0625" contype="1" conaffinity="2" group="3" rgba="0 0 0 0" solref=".002 1" friction=".3 .005 .0001" />
+        </body>
+        <body name="outpost_1" pos="-0.1375 0.238156986041 1.216" quat="0.495722430687 -0.113038998322 0.06526309611 0.858616436401">
+          <inertial pos="0 0 0" mass=".1" diaginertia=".0004 .0002 .0003" />
+          <geom name="outpost_1_small_armor" type="mesh" mesh="target_small_armor" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_1_small_armor_target" type="mesh" mesh="target_small_armor_target" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_1_small_armor_light_bar" type="mesh" mesh="target_small_armor_light_bar" pos="0 0 -.0625" material="outpost_glow" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_1_number" type="mesh" mesh="target_small_num2_plane" pos=".014 0 0" quat=".5 .5 .5 .5" material="target_sticker" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_hitbox_1" type="box" pos=".004 0 0" size=".012 .0675 .0625" contype="1" conaffinity="2" group="3" rgba="0 0 0 0" solref=".002 1" friction=".3 .005 .0001" />
+        </body>
+        <body name="outpost_2" pos="-0.1375 -0.238156986041 1.318" quat="-0.495722430687 -0.113038998322 -0.06526309611 0.858616436401">
+          <inertial pos="0 0 0" mass=".1" diaginertia=".0004 .0002 .0003" />
+          <geom name="outpost_2_small_armor" type="mesh" mesh="target_small_armor" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_2_small_armor_target" type="mesh" mesh="target_small_armor_target" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_2_small_armor_light_bar" type="mesh" mesh="target_small_armor_light_bar" pos="0 0 -.0625" material="outpost_glow" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_2_number" type="mesh" mesh="target_small_num2_plane" pos=".014 0 0" quat=".5 .5 .5 .5" material="target_sticker" contype="0" conaffinity="0" group="2" />
+          <geom name="outpost_hitbox_2" type="box" pos=".004 0 0" size=".012 .0675 .0625" contype="1" conaffinity="2" group="3" rgba="0 0 0 0" solref=".002 1" friction=".3 .005 .0001" />
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

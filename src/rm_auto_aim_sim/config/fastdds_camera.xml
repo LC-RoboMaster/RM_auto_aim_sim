@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Optional Fast DDS profile for local 1280x1024 RGB8 camera traffic.
+     Apply FASTRTPS_DEFAULT_PROFILES_FILE in both publisher and subscriber.
+     Each participant reserves a 16 MiB SHM segment; UDP remains for discovery
+     and remote peers. This does not change the ROS SensorDataQoS policies. -->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>rm_sim_camera_shm</transport_id>
+      <type>SHM</type>
+      <segment_size>16777216</segment_size>
+      <maxMessageSize>8388608</maxMessageSize>
+      <port_queue_capacity>512</port_queue_capacity>
+    </transport_descriptor>
+    <transport_descriptor>
+      <transport_id>rm_sim_camera_udp</transport_id>
+      <type>UDPv4</type>
+    </transport_descriptor>
+  </transport_descriptors>
+  <participant profile_name="rm_sim_camera" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>rm_sim_camera_shm</transport_id>
+        <transport_id>rm_sim_camera_udp</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>

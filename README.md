@@ -1,3 +1,41 @@
+# RM Auto Aim MuJoCo Simulator
+
+当前完整开发版本位于 [`feat/rmuc-armor-lab`](https://github.com/LC-RoboMaster/RM_auto_aim_sim/tree/feat/rmuc-armor-lab)
+分支，包含已合入的 HDR Shader、异步相机和性能面板；`main` 暂时仍是初始版本。
+
+**[参数配置与 UI 对照](src/rm_auto_aim_sim/docs/CONFIGURATION.md)**：
+`src/rm_auto_aim_sim/config/sim.yaml` 已集中列出全部参数并逐项添加中文注释。
+相机光照在第 3 组；UI 修改只影响当前运行，不自动写回 YAML。
+
+**[150 FPS 发布与测速指南](src/rm_auto_aim_sim/docs/PERFORMANCE.md)**：
+当前默认 1280×1024 / 150 FPS 请求，viewer 预览上限 30 FPS；采集和 ROS 发布分线程。
+用 `ros2 run rm_auto_aim_sim camera_rate_probe --seconds 10 --min-fps 145` 验收实际接收率。
+
+## 三板前哨站与连续 yaw
+
+新增 **OUTPOST（前哨站）**：三块装甲板中心位于直径 550 mm 的圆周，俯视间隔 120°，
+中心距地面分别为 1114 / 1216 / 1318 mm，数字面朝外下倾（与地面夹角 75°）。
+与 **ARMOR（四板装甲板）** 分组独立设置位置、尺寸、高度、颜色、旋转方向和速度。
+`config/sim.yaml` 使用 `armor_*` / `outpost_*`；旧 `target_*` 参数仍兼容读取。
+示例默认同时显示两类目标；`armor_enabled` / `outpost_enabled` 可分别关闭（重启生效）。
+
+云台默认 `yaw_continuous: true`，允许连续多圈旋转，ROS yaw 反馈范围 [-π,π]。
+例如 +179° → -179° 按最短路径转 +2°。UI 的 Continuous yaw 可切换；
+`yaw_min` / `yaw_max` 仅在连续模式关闭时生效，pitch 仍保留限位。
+参数与 UI 说明见 [CONFIGURATION.md](src/rm_auto_aim_sim/docs/CONFIGURATION.md)。
+
+## v0.2：RMUC 场地、旋转装甲目标与测试面板
+
+新增四板靶标（r1/r2、h1/h2、XYZ、15° 上倾、红蓝切换、可调正反转）、
+命中统计和曲线、深色简洁 UI、自定义 fx/fy/cx/cy 与环境亮度。
+
+**[新功能完整使用说明](src/rm_auto_aim_sim/docs/ARMOR_LAB.md)**。
+默认配置启动带用户装甲模型的轻量调试场地；实际 RMUC 场地由上游场地包导入，
+使用导入脚本生成的 `sim_rmuc.yaml` 启动。未随仓库分发官方派生场地资产。
+
+旧版指南仍可参考，下列旧静态红蓝靶标只保留在 `scenes/arena.xml` 回归场景中。
+新的默认场景是 `scenes/lab.xml`，参数和界面变更以上方 v0.2 指南为准。
+
 # RoboMaster 自瞄视觉仿真器（MuJoCo + ROS2 Humble）
 
 这是一个独立的 C++17 工程，参考 [RM_Dron_mujoco_sim](https://github.com/Spaaaace-yyj/RM_Dron_mujoco_sim) 的官方 viewer 集成方式，面向 Ubuntu 22.04、Conda/pip MuJoCo 3.3.7、ROS2 Humble。第一版提供二轴云台、手动/自动模式、RGB 相机、完整 TF 和物理弹丸。后续可以在场景中加入旋转装甲板。
@@ -7,7 +45,7 @@
 - 保留官方 `simulate` 的观察、暂停、物理/可视化菜单，右侧增加 `Auto Aim` 菜单。
 - 手动平移云台底座、控制 pitch/yaw；切换自由观察相机和云台相机。
 - 自动模式订阅两个 `std_msgs/msg/Float64` 绝对角度命令；单位为**弧度**。
-- 独立 OpenGL 相机线程，默认 **640×480 / 120 FPS / RGB8**；配置支持 100、120、150 FPS。
+- 独立 OpenGL 相机线程，默认 **1280×1024 / 150 FPS / RGB8**；配置支持 100、120、150 FPS。
 - 发布同时间戳的 Image/CameraInfo、完整 TF、pitch/yaw、JointState 和 `/clock`。
 - 自动 Bool 连射和手动第一人称左键按住连射，共用发射调度器，默认 **15 Hz**。
 - 默认弹丸**直径 17 mm、速度 22 m/s、质量 3.2 g**，绿色自发光材质，重力和接触由 MuJoCo 求解。
@@ -25,7 +63,7 @@
 ```bash
 sudo apt update
 sudo apt install -y build-essential cmake ninja-build libglfw3-dev libyaml-cpp-dev \
-  libgl1-mesa-dev python3-colcon-common-extensions \
+  libgl1-mesa-dev libegl1-mesa-dev python3-colcon-common-extensions \
   ros-humble-rclcpp ros-humble-rclpy ros-humble-sensor-msgs \
   ros-humble-geometry-msgs ros-humble-rosgraph-msgs ros-humble-std-msgs \
   ros-humble-tf2-msgs ros-humble-tf2-ros ros-humble-rqt-image-view
@@ -76,6 +114,35 @@ ros2 run rm_auto_aim_sim rm_auto_aim_sim \
 
 ## 3. 手动操作
 
+### 相机画质和性能
+
+`config/sim.yaml` 默认启用相机 Shader。右侧 **CAMERA / LIGHT** 可实时切换
+`Shader camera` 和 `Shadows`，并调整曝光、Bloom 和灯条强度；关闭 Shader 时输出
+MuJoCo 原生画面，方便在同一场景比较。灯条局部照明采用深度重建和 GGX
+高光，发光部分进入 RGBA16F 缓冲，Bloom 在四分之一分辨率处理，最后固定曝光
+并转换成 RGB8。场景纹理和基础环境光仍由 MuJoCo 绘制。
+
+配置保留当前用户调整的外观。漫水二值化需要黑背景时，可以开启 `Black sky`、
+将 `Floor / scene color` 设为 0、`Scene light` 设为 0.03。右侧滑条可分别调背景亮度、灯条灰度、
+灯条发光和光晕；`Exposure` 会改变整张图像。点击 `Restore YAML look` 可恢复
+`config/sim.yaml` 中的外观参数。Shader 作用于 `/image_raw`；3D viewer 的
+`Gimbal` 视角仍是 MuJoCo 原生预览，查看算法输入请打开图像话题。
+
+右侧 **PERFORMANCE** 分别显示采集 FPS、发布回调完成 FPS、采集到发布延迟、各 CPU 提交阶段
+耗时、进程 CPU/RSS 和估算的相机缓冲区大小。CPU 100% 表示占满一个逻辑核；
+`GPU render` 是显卡计时查询的场景和 Shader 绘制时间，`GPU transfer` 是显卡写入
+PBO 的时间，`PBO map/copy` 是 CPU 取回缓冲的时间；`Render submit` 是 CPU
+提交耗时。打开 `Show perf plots` 可查看最近
+15 秒的阶段耗时和进程负载。异步 PBO 队列最多 3 帧，忙时丢弃新采集，防止
+图像越积越旧；消息保留各自采集时刻的仿真时间、内参和位姿。
+暂停后仍会收完已提交的 GPU 图像，队列收空后不重复采集同一仿真时刻；FPS
+随后归零，CPU/RSS 继续更新。检测到重置或历史回退导致采集时间倒退时，先丢弃
+队列中的旧图像，再提交新时间线的图像。GPU 和发布队列的丢弃分别计数。
+
+在相同配置、场景和显卡上，分别切换两种模式并记录 FPS 与延迟，才能判断
+该设备上的性能差异。无显示器时可运行
+`MUJOCO_GL=egl python src/rm_auto_aim_sim/tests/run_render_test.py --library build/libaim_render_probe.so`。
+
 右侧 `Auto Aim` 菜单的 `Control mode` 选择 `MANUAL`，`View` 选择 `Gimbal`。原生 Rendering 菜单也能选 `gimbal_camera`，`Esc` 返回自由相机。
 
 | 操作 | 效果 |
@@ -105,7 +172,7 @@ ros2 run rm_auto_aim_sim rm_auto_aim_sim \
 | 发布 | `/tf`、`/tf_static` | `tf2_msgs/msg/TFMessage` | 动态/固定变换 |
 | 发布 | `/clock` | `rosgraph_msgs/msg/Clock` | MuJoCo 仿真时间 |
 | 发布 | `/sim/shot_count` | `std_msgs/msg/UInt64` | 累计成功发射数；reset 后归零 |
-| 发布 | `/sim/projectile_hit` | `std_msgs/msg/String` | 每颗弹丸首次接触 JSON；尚不是装甲板命中判定 |
+| 发布 | `/sim/projectile_hit` | `std_msgs/msg/String` | 每颗弹丸首次接触 JSON；含 armor/outpost 分类及板号 |
 | 发布 | `/sim/camera_fps` | `std_msgs/msg/Float64` | 相机最近两秒的实际墙钟采集 FPS |
 | 订阅 | `/gimbal/target_pitch` | `std_msgs/msg/Float64` | pitch **绝对目标角度**，rad |
 | 订阅 | `/gimbal/target_yaw` | `std_msgs/msg/Float64` | yaw **绝对目标角度**，rad |
@@ -155,7 +222,7 @@ flowchart TD
 
 ## 6. 性能与扩展
 
-相机先复制物理状态再释放锁，GPU 渲染和 DDS 发布均在物理锁外执行。相机持有自己的 mjModel/mjData、mjvScene 和离屏 framebuffer；复用读回缓冲，落后时跳过采集而不累计延迟。实际采样时刻落在物理步上，帧间仿真时间可能略有离散。
+相机先复制物理状态再释放锁，GPU 渲染和 DDS 发布均在物理锁外执行；DDS 在独立发布线程，不阻塞相机。相机持有自己的 mjModel/mjData、mjvScene 和离屏 framebuffer；复用读回缓冲，落后时跳过采集而不累计延迟。实际采样时刻落在物理步上，帧间仿真时间可能略有离散。
 
 物理默认步长 0.5 ms，22 m/s 每步移动 11 mm，小于弹丸直径。MuJoCo 接触仍是离散检测；未来加入很薄、高速移动的靶标时，需要减小步长或增加扫掠检测，不能直接把当前首次接触事件当成最终比赛命中结果。
 
@@ -180,7 +247,7 @@ bash run_standalone.sh
 ```bash
 MUJOCO_GL=egl python src/rm_auto_aim_sim/tests/run_render_test.py \
   --library build/standalone/libaim_render_probe.so \
-  --config src/rm_auto_aim_sim/config/sim.yaml --output /tmp/camera_test.ppm
+  --config src/rm_auto_aim_sim/tests/test_config.yaml --output /tmp/camera_test.ppm
 ```
 
 当前交付验证范围见 [TEST_RESULTS.md](TEST_RESULTS.md)。ROS2/你的 RTX 4060 实测帧率需要在 Ubuntu 22.04 目标机运行检查脚本。
