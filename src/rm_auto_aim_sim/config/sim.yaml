@@ -27,12 +27,11 @@ rm_auto_aim_sim:
     camera_cy: 510.515086          # 垂直主点 [0,camera_height)；UI 编辑后点 Apply intrinsics。
 
     # ── 3. 相机光照、灯条与 HDR / Bloom（UI: CAMERA / LIGHT）─────────
-    # 前四项同时影响原生 viewer 与独立 RGB；后五项仅作用于独立相机输出 /image_raw。
+    # 场景参数影响 viewer 与独立 RGB；camera_* 渲染参数仅作用于独立相机输出。
     # 黑背景预设：dark_sky=true、environment_albedo=0、lighting_brightness=0.03。
     lighting_brightness: 0.285      # UI: Scene light；场景基础光源/头灯倍率 [0,3]，不关闭灯条自发光。
     dark_sky: true                # UI: Black sky；true 关闭天空盒与雾，背景为黑色。
     environment_albedo: 0.495        # UI: Floor / scene color；静态环境颜色/高光倍率 [0,1]，0 黑、1 原色。
-    target_light_whiteness: 0.06   # UI: LED white mix；灯条向白色混合比例 [0,1]，提高灰度；1 时丢失红蓝色差。
     camera_shader: true            # UI: Shader camera；HDR 灯条补光、Bloom、固定曝光和色调映射总开关。
     camera_projectile_opacity: 1.0  # UI: ROS bullet opacity；不透明度 [0,1]，0 隐藏、1 完全显示；仅相机，不影响 viewer/物理/命中。
     camera_shadows: false          # UI: Shadows；RGB 基础光源阴影开关；增加 GPU 开销，不依赖 Shader 开关。
@@ -40,31 +39,49 @@ rm_auto_aim_sim:
     camera_bloom: 0.34              # UI: Halo strength；HDR 图像空间光晕叠加强度 [0,2]，0 关闭光晕。
     camera_lamp_intensity: 3.7     # UI: LED HDR brightness；附加灯条补光/发光强度 [0,20]，0 仍保留原生自发光。
     # camera_shader=false 时 exposure/bloom/lamp_intensity 不生效；camera_shadows 仍然生效。
-    # Restore YAML look 恢复本次启动的这 9 项（含 ROS 参数覆盖），不重新读磁盘、不保存 UI。
+    # Restore YAML look 恢复本次启动的相机外观及两种靶标灯条混白（含 ROS 参数覆盖），不重新读磁盘、不保存 UI。
     # viewer 的 Gimbal 视角仍是 MuJoCo 原生画面；观察 Shader 成像请查看图像话题。
 
-    # ── 4. 四块旋转装甲板（UI: ARMOR TARGET）───────────────────────
-    target_enabled: true           # 是否在模型中启用四板靶标；false 时不创建目标模块。
-    target_x: 5.0                  # UI: Center XYZ [m]；目标旋转中心世界坐标 X。
-    target_y: 0.0                  # 目标旋转中心世界坐标 Y。
-    target_z: 0.0                  # 中心基准 Z；各板中心实际高度为 target_z + h1/h2。
-    target_r1: 0.6                 # UI: r1 [m]；0/2 号相对板半径 [0.08,5] m。
-    target_r2: 0.6                 # UI: r2 [m]；1/3 号相对板半径 [0.08,5] m。
-    target_h1: 0.8                 # UI: h1 [m]；0/2 号板中心相对高度 [0.08,5] m。
-    target_h2: 0.8                 # UI: h2 [m]；1/3 号板中心相对高度 [0.08,5] m。
-    target_tilt_deg: 15.0          # 装甲正面法线向上倾角 [-60,60] 度；标准预设 15 度。
-    target_angular_speed: 0.0      # UI: Speed + Direction；带符号角速度 [-30,30] rad/s；+Z 逆时针为正。
-    target_initial_angle: 0.0      # 初始朝向 rad；UI 的 Reset heading 将运行时朝向置零。
-    target_color: "blue"           # UI: Color；red 或 blue，灯条白色混合由第 3 组控制。
+    # ── 4. 四块旋转装甲板（UI: ARMOR (4 PLATES)）───────────────────────
+    armor_enabled: true           # 是否在模型中启用四板靶标；false 时不创建目标模块。
+    armor_x: 5.0                  # UI: Center XYZ [m]；目标旋转中心世界坐标 X。
+    armor_y: 0.0                  # 目标旋转中心世界坐标 Y。
+    armor_z: 0.0                  # 中心基准 Z；各板中心实际高度为 armor_z + h1/h2。
+    armor_r1: 0.6                 # UI: r1 [m]；0/2 号相对板半径 [0.08,5] m。
+    armor_r2: 0.6                 # UI: r2 [m]；1/3 号相对板半径 [0.08,5] m。
+    armor_h1: 0.8                 # UI: h1 [m]；0/2 号板中心相对高度 [0.08,5] m。
+    armor_h2: 0.8                 # UI: h2 [m]；1/3 号板中心相对高度 [0.08,5] m。
+    armor_tilt_deg: 15.0          # UI: Normal up [deg]；装甲正面法线向上倾角 [-60,60] 度；标准预设 15 度。
+    armor_angular_speed: 0.0      # UI: Speed + Direction；带符号角速度 [-30,30] rad/s；+Z 逆时针为正。
+    armor_initial_angle: 0.0      # UI: Heading [rad]；初始朝向 rad；Reset heading 将运行时朝向置零。
+    armor_color: "blue"           # UI: Color；red 或 blue，灯条白色混合由本组 armor_light_whiteness 控制。
 
-    # ── 5. 物理、状态发布与手动/自动控制 ──────────────────────────
+    armor_light_whiteness: 0.06   # UI: LED white mix；灯条向白色混合比例 [0,1]，提高灰度；1 时丢失红蓝色差。
+
+    # ── 5. 前哨站 OUTPOST（三板，俯视等间隔 120°）─────────────────
+    outpost_enabled: true         # 启动时加载前哨站；可与 armor 同时启用；改变此开关需要重启。
+    outpost_x: 5.0                # UI: Center XYZ [m]；旋转轴世界坐标 X。
+    outpost_y: 2.0                # 旋转轴世界坐标 Y；默认与 armor 分开放置。
+    outpost_z: 0.0                # 地面/基准面世界 Z；三板中心世界高度 = 此值 + h1/h2/h3。
+    outpost_diameter: 0.550        # UI: Diameter [m]；三块板中心轨迹圆直径 [0.16,10] m；半径 0.275 m。
+    outpost_h1: 1.114              # UI: Height 0 [m]；0 号板中心距基准地面高度 [0.08,5] m。
+    outpost_h2: 1.216              # UI: Height 1 [m]；1 号板中心距基准地面高度 [0.08,5] m。
+    outpost_h3: 1.318              # UI: Height 2 [m]；2 号板中心距基准地面高度 [0.08,5] m。
+    outpost_plane_angle_deg: 75.0  # UI: Plane / floor [deg]；数字面与水平地面夹角 [30,90] 度，法线朝外且向下；75 对应下倾 15 度。
+    outpost_angular_speed: 0.0     # UI: Speed + Direction；带符号角速度 [-30,30] rad/s；从上往下看，正=逆时针，负=顺时针，0 静止。
+    outpost_initial_angle: 0.0     # UI: Heading [rad]；0 号板初始径向角 rad，1/2 号依次 +120/+240 度。
+    outpost_color: "red"           # UI: Color；red 或 blue；独立于 armor 灯条颜色。
+    outpost_light_whiteness: 0.06  # UI: LED white mix；灯条混白比例 [0,1]，独立于 armor。
+
+    # ── 6. 物理、状态发布与手动/自动控制 ──────────────────────────
     physics_timestep: 0.0005       # 物理步长 (0,0.001] s；当前值对应 2000 Hz。
     state_hz: 150.0                # 状态、TF、/clock 发布目标频率 Hz；>0 且不超过物理频率。
     manual_translation_speed: 2.0  # WASD/QE 底座平移速度 >0 m/s。
     manual_angular_speed: 1.5      # 方向键角速度 >0 rad/s。
     mouse_sensitivity: 0.003       # 右键拖动的角度灵敏度 >0 rad/鼠标位移单位。
-    yaw_min: -3.141592653589793    # yaw 下限 rad（-180 度）；正 yaw 向左绕 +Z。
-    yaw_max: 3.141592653589793     # yaw 上限 rad（+180 度）；min 必须小于 max。
+    yaw_continuous: true          # UI: Continuous yaw；true 连续转动、跨越 ±π 并走最短角路径；false 启用下面的机械限位。
+    yaw_min: -3.141592653589793    # 仅 yaw_continuous=false 生效；yaw 下限 rad；正 yaw 绕 +Z。
+    yaw_max: 3.141592653589793     # 仅 yaw_continuous=false 生效；yaw 上限 rad；min 必须小于 max。
     pitch_min: -0.523598775598299  # pitch 下限 rad（-30 度）；正 pitch 抬头。
     pitch_max: 0.785398163397448   # pitch 上限 rad（+45 度）。
     servo_max_speed: 8.0            # 理想云台角度伺服最大速度 >0 rad/s。
@@ -77,7 +94,7 @@ rm_auto_aim_sim:
     angle_command_timeout: 0.0     # ROS 角度命令超时 >=0 s；0 持续保持，超时在当前位置停跟踪。
     fire_command_timeout: 0.0      # ROS 开火命令超时 >=0 s；0 保持 true 到 false/切模式/重置。
 
-    # ── 6. 弹丸与连射 ────────────────────────────────────────────
+    # ── 7. 弹丸与连射 ────────────────────────────────────────────
     fire_rate_hz: 15.0             # 连射频率 >0 Hz，且不超过物理频率。
     projectile_speed: 25.0         # 枪口初速 >0 m/s；初速×物理步长不得大于弹丸直径。
     projectile_diameter: 0.017     # 弹丸直径 >0 m（17 mm），不是半径。
@@ -86,7 +103,7 @@ rm_auto_aim_sim:
     projectile_lifetime: 8.0       # 飞行寿命 >0 s，按仿真时间回收。
     projectile_hit_lifetime: 2.0   # 首次接触后保留时长 >0 s；飞行寿命仍会限制总寿命。
 
-    # ── 7. MuJoCo 模型对象绑定（须与场景 XML 的 name 一致）──────────
+    # ── 8. MuJoCo 模型对象绑定（须与场景 XML 的 name 一致）──────────
     model_base_body: "base_link"   # mocap 云台底座 body。
     model_yaw_body: "yaw_link"     # yaw 轴 body。
     model_pitch_body: "pitch_link" # pitch 轴 body。
@@ -96,7 +113,7 @@ rm_auto_aim_sim:
     model_camera_name: "gimbal_camera" # MuJoCo camera。
     model_muzzle_site: "muzzle"    # 枪口 site；弹丸沿该 site 的 +X 方向发射。
 
-    # ── 8. ROS TF 名称（与 XML 对象名独立，不可重复、为空或以 / 开头）─
+    # ── 9. ROS TF 名称（与 XML 对象名独立，不可重复、为空或以 / 开头）─
     frame_world: "world"           # 世界坐标系；x 前、y 左、z 上。
     frame_base: "odom"             # 云台底座坐标系；保留当前算法使用的 odom 命名。
     frame_yaw: "yaw_link"          # yaw 轴坐标系。
@@ -105,14 +122,14 @@ rm_auto_aim_sim:
     frame_camera_optical: "camera_optical_frame" # 图像光学系；x 右、y 下、z 前。
     frame_muzzle: "muzzle_link"    # 枪口坐标系。
 
-    # ── 9. ROS2 话题（独立运行版不发布/订阅）───────────────────────
+    # ── 10. ROS2 话题（独立运行版不发布/订阅）───────────────────────
     # 图像与 CameraInfo：SensorDataQoS / best effort / depth=2；同帧时间戳一致。
     topic_image: "/image_raw"      # 发布 sensor_msgs/Image，rgb8，无畸变相机图像。
     topic_camera_info: "/camera_info" # 发布 sensor_msgs/CameraInfo，与实际 K 对应。
     topic_camera_fps: "/sim/camera_fps" # 发布 Float64，相机输出帧携带的最近墙钟 FPS。
     # 状态输出；除 /clock 外为 reliable。数值单位 rad、rad/s，统计比例为 0~1。
     topic_pitch_state: "/gimbal/pitch" # 发布 Float64，实际 pitch 角度 rad。
-    topic_yaw_state: "/gimbal/yaw" # 发布 Float64，实际 yaw 角度 rad。
+    topic_yaw_state: "/gimbal/yaw" # 发布 Float64，实际 yaw 角度 rad；连续模式归一化到 [-π,π]。
     topic_joint_states: "/joint_states" # 发布 JointState，yaw/pitch 角度与角速度。
     topic_clock: "/clock"          # 发布 rosgraph_msgs/Clock，best effort，MuJoCo 仿真时间。
     topic_tf: "/tf"                # 发布动态 world→base→yaw→pitch 变换。
@@ -124,5 +141,5 @@ rm_auto_aim_sim:
     topic_statistics: "/sim/statistics" # 发布 String/JSON，epoch、发射/命中及各板计数。
     # 控制输入：reliable / volatile / depth=1；需先切到 auto 模式才接收。
     topic_pitch_command: "/gimbal/target_pitch" # 订阅 Float64，绝对目标 pitch rad。
-    topic_yaw_command: "/gimbal/target_yaw" # 订阅 Float64，绝对目标 yaw rad。
+    topic_yaw_command: "/gimbal/target_yaw" # 订阅 Float64，绝对目标 yaw rad；连续模式按 2π 等价并走最短角路径。
     topic_fire_command: "/gimbal/fire" # 订阅 Bool，true 持续连射，false 停止。

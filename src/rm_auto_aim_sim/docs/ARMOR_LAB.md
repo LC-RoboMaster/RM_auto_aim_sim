@@ -52,21 +52,21 @@ heightfield：遮挡用 CAD 外观，跨层、桥下、悬挑结构的子弹碰�
 
 | 参数 | 默认值 | 含义 |
 | --- | --- | --- |
-| `target_x/y/z` | 5 / 0 / 0 m | 旋转轴在世界中的位置 |
-| `target_r1` | 0.6 m | 0、2 号板中心到旋转轴的水平距离 |
-| `target_r2` | 0.6 m | 1、3 号板中心到旋转轴的水平距离 |
-| `target_h1` | 0.8 m | 0、2 号板中心相对轴原点的高度 |
-| `target_h2` | 0.8 m | 1、3 号板中心相对轴原点的高度 |
-| `target_tilt_deg` | 15° | 板面外法线向天空抬高的角度 |
-| `target_angular_speed` | 0 rad/s | 有符号速度：+ 为从 +Z 往下看的逆时针 |
-| `target_initial_angle` | 0 rad | 启动方位 |
-| `target_color` | red | red / blue |
+| `armor_x/y/z` | 5 / 0 / 0 m | 旋转轴在世界中的位置 |
+| `armor_r1` | 0.6 m | 0、2 号板中心到旋转轴的水平距离 |
+| `armor_r2` | 0.6 m | 1、3 号板中心到旋转轴的水平距离 |
+| `armor_h1` | 0.8 m | 0、2 号板中心相对轴原点的高度 |
+| `armor_h2` | 0.8 m | 1、3 号板中心相对轴原点的高度 |
+| `armor_tilt_deg` | 15° | 板面外法线向天空抬高的角度 |
+| `armor_angular_speed` | 0 rad/s | 有符号速度：+ 为从 +Z 往下看的逆时针 |
+| `armor_initial_angle` | 0 rad | 启动方位 |
+| `armor_color` | red | red / blue |
 
-板中心世界高度为 `target_z + h1/h2`。r1≠r2 时四点形成椭圆的四个轴端点；
+板中心世界高度为 `armor_z + h1/h2`。r1≠r2 时四点形成椭圆的四个轴端点；
 h1≠h2 时相邻板不等高，相对板保持等高。倾斜使用局部 -Y 旋转：
 `normal = (cos(15°), 0, sin(15°))`，并随每块板的径向方位旋转。
 
-右侧 ARMOR TARGET 面板支持直接编辑 Center XYZ、滑条调半径/高度、切换颜色、
+右侧 ARMOR (4 PLATES) 面板支持直接编辑 Center XYZ、滑条调半径/高度、切换颜色、
 速度和方向；Reset heading 将方位重置为零。修改立即生效，可在暂停时设置。
 本版位置编辑采用坐标输入，没有额外的三轴拖动 gizmo。
 
@@ -151,7 +151,7 @@ UI 修改是当前会话值，不会自动覆写 YAML。
 lighting_brightness: 0.03     # 环境灯/headlight 的强度
 dark_sky: true
 environment_albedo: 0.0     # 0 = 场地完全黑；1 = 原始颜色
-target_light_whiteness: 0.65 # 0 = 原来的纯色灯条；1 = 白色、失去颜色区分
+armor_light_whiteness: 0.65 # 0 = 原来的纯色灯条；1 = 白色、失去颜色区分
 ```
 
 右侧 CAMERA / LIGHT 中的

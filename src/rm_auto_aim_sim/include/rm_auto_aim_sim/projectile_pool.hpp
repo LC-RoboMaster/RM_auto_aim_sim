@@ -26,6 +26,7 @@ class ProjectilePool {
   std::uint64_t ArmorHits() const { return armor_hits_; }
   std::uint64_t StatisticsEpoch() const { return statistics_epoch_; }
   const std::array<std::uint64_t, 4>& PlateHits() const { return plate_hits_; }
+  const std::array<std::uint64_t, 3>& OutpostPlateHits() const { return outpost_plate_hits_; }
 
  private:
   struct Slot {
@@ -48,7 +49,8 @@ class ProjectilePool {
   std::uint64_t exhausted_count_ = 0;
   std::uint64_t statistics_shots_ = 0, armor_hits_ = 0, statistics_epoch_ = 0;
   std::array<std::uint64_t, 4> plate_hits_{};
-  std::vector<int> geom_to_armor_;
+  std::array<std::uint64_t, 3> outpost_plate_hits_{};
+  std::vector<int> geom_to_armor_, geom_to_outpost_;
 };
 
 }  // namespace rm_auto_aim_sim

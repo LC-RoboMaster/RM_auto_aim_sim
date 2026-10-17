@@ -13,23 +13,39 @@ int Id(const mjModel* model, mjtObj type, const std::string& name) {
 }
 }  // namespace
 
-ArmorTarget::ArmorTarget(const Config& config, mjModel* model) : model_(model) {
-  center_mocap_ = model->body_mocapid[Id(model, mjOBJ_BODY, "target_center")];
-  const int joint = Id(model, mjOBJ_JOINT, "target_spin");
+ArmorTarget::ArmorTarget(const Config& config, mjModel* model, bool outpost)
+    : outpost_(outpost), plate_count_(outpost ? 3 : 4), model_(model) {
+  const std::string prefix = outpost_ ? "outpost" : "target";
+  center_mocap_ = model->body_mocapid[Id(model, mjOBJ_BODY, prefix + "_center")];
+  const int joint = Id(model, mjOBJ_JOINT, prefix + "_spin");
   qpos_ = model->jnt_qposadr[joint];
   dof_ = model->jnt_dofadr[joint];
-  material_ = Id(model, mjOBJ_MATERIAL, "target_glow");
-  for (int i = 0; i < 4; ++i) bodies_[i] = Id(model, mjOBJ_BODY, "armor_" + std::to_string(i));
-  settings_.center = {config.target_x, config.target_y, config.target_z};
-  settings_.r1 = config.target_r1;
-  settings_.r2 = config.target_r2;
-  settings_.h1 = config.target_h1;
-  settings_.h2 = config.target_h2;
-  settings_.tilt = config.target_tilt_deg * mjPI / 180.0;
-  settings_.angular_speed = config.target_angular_speed;
-  settings_.angle = config.target_initial_angle;
-  settings_.color = config.target_color == "blue" ? 1 : 0;
-  settings_.light_whiteness = config.target_light_whiteness;
+  material_ = Id(model, mjOBJ_MATERIAL, prefix + "_glow");
+  for (int i = 0; i < plate_count_; ++i)
+    bodies_[i] = Id(model, mjOBJ_BODY, (outpost_ ? "outpost_" : "armor_") + std::to_string(i));
+  settings_.center = {config.armor_x, config.armor_y, config.armor_z};
+  settings_.r1 = config.armor_r1;
+  settings_.r2 = config.armor_r2;
+  settings_.h1 = config.armor_h1;
+  settings_.h2 = config.armor_h2;
+  settings_.tilt = config.armor_tilt_deg * mjPI / 180.0;
+  settings_.angular_speed = config.armor_angular_speed;
+  settings_.angle = config.armor_initial_angle;
+  settings_.color = config.armor_color == "blue" ? 1 : 0;
+  settings_.light_whiteness = config.armor_light_whiteness;
+  if (outpost_) {
+    settings_.center = {config.outpost_x, config.outpost_y, config.outpost_z};
+    settings_.r1 = settings_.r2 = config.outpost_diameter / 2;
+    settings_.h1 = config.outpost_h1;
+    settings_.h2 = config.outpost_h2;
+    settings_.h3 = config.outpost_h3;
+    // +X is the outward number-face normal; negative tilt points down.
+    settings_.tilt = (config.outpost_plane_angle_deg - 90) * mjPI / 180;
+    settings_.angular_speed = config.outpost_angular_speed;
+    settings_.angle = config.outpost_initial_angle;
+    settings_.color = config.outpost_color == "blue" ? 1 : 0;
+    settings_.light_whiteness = config.outpost_light_whiteness;
+  }
   initial_ = settings_;
 }
 
@@ -45,14 +61,18 @@ void ArmorTarget::Configure(const TargetSettings& value, mjData* data) {
       !std::isfinite(value.light_whiteness) || value.light_whiteness < 0 ||
       value.light_whiteness > 1)
     throw std::runtime_error("Target settings out of range");
+  if (outpost_ && (!std::isfinite(value.h3) || value.h3 < .08 || value.h3 > 5 ||
+                   value.tilt > 0))
+    throw std::runtime_error("Outpost height/plane angle invalid");
   settings_ = value;
-  for (int i = 0; i < 4; ++i) {
-    const double phase = i * mjPI / 2;
-    const double radius = i % 2 ? value.r2 : value.r1;
+  for (int i = 0; i < plate_count_; ++i) {
+    const double phase = i * 2 * mjPI / plate_count_;
+    const double radius = outpost_ ? value.r1 : (i % 2 ? value.r2 : value.r1);
     auto* pos = model_->body_pos + 3 * bodies_[i];
     pos[0] = radius * std::cos(phase);
     pos[1] = radius * std::sin(phase);
-    pos[2] = i % 2 ? value.h2 : value.h1;
+    pos[2] = outpost_ ? (i == 0 ? value.h1 : (i == 1 ? value.h2 : value.h3))
+                      : (i % 2 ? value.h2 : value.h1);
     // Local +X is the front normal. A negative Y rotation tips it toward the sky.
     const mjtNum yaw[4] = {std::cos(phase / 2), 0, 0, std::sin(phase / 2)};
     const mjtNum tilt[4] = {std::cos(value.tilt / 2), 0, -std::sin(value.tilt / 2), 0};

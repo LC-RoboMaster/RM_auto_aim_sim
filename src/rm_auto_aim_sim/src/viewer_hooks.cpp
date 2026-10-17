@@ -22,7 +22,10 @@ SensorWorker* sensor = nullptr;
 int mode_ui = 0, view_ui = 0, direction_ui = 0, plots_ui = 1;
 int control_section = -1, target_section = -1, camera_section = -1, stats_section = -1;
 int performance_section = -1, performance_plots_ui = 0;
-TargetSettings target_ui;
+TargetSettings target_ui, outpost_ui;
+int outpost_section = -1, outpost_direction_ui = 0, yaw_continuous_ui = 1;
+double outpost_speed_ui = 0, outpost_diameter_ui = .55, outpost_plane_ui = 75;
+double armor_tilt_ui = 15;
 CameraIntrinsics camera_ui{};
 double speed_ui = 0, brightness_ui = 1, albedo_ui = 1, lamp_white_ui = 0;
 int dark_sky_ui = 0;
@@ -123,7 +126,7 @@ void RestoreCameraLook(mujoco::Simulate* sim) {
   brightness_ui = config.lighting_brightness;
   dark_sky_ui = config.dark_sky;
   albedo_ui = config.environment_albedo;
-  lamp_white_ui = config.target_light_whiteness;
+  lamp_white_ui = config.armor_light_whiteness;
   shader_ui = config.camera_shader;
   shadows_ui = config.camera_shadows;
   exposure_ui = config.camera_exposure;
@@ -137,6 +140,10 @@ void RestoreCameraLook(mujoco::Simulate* sim) {
   if (engine->Target()) {
     engine->Target()->SetLightWhiteness(lamp_white_ui);
     target_ui.light_whiteness = lamp_white_ui;
+  }
+  if (engine->Outpost()) {
+    engine->Outpost()->SetLightWhiteness(config.outpost_light_whiteness);
+    outpost_ui.light_whiteness = config.outpost_light_whiteness;
   }
   if (sensor)
     sensor->SetRendering(shader_ui != 0, shadows_ui != 0, exposure_ui,
@@ -160,6 +167,13 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   if (saved_free_camera.type != mjCAMERA_FREE)
     mjv_defaultFreeCamera(engine->Model(), &saved_free_camera);
   if (engine->Target()) target_ui = engine->Target()->Settings();
+  if (engine->Outpost()) outpost_ui = engine->Outpost()->Settings();
+  outpost_diameter_ui = 2 * outpost_ui.r1;
+  outpost_plane_ui = 90 + outpost_ui.tilt * 180 / mjPI;
+  outpost_speed_ui = std::abs(outpost_ui.angular_speed);
+  outpost_direction_ui = outpost_ui.angular_speed < 0;
+  armor_tilt_ui = target_ui.tilt * 180 / mjPI;
+  yaw_continuous_ui = engine->YawContinuous();
   speed_ui = std::abs(target_ui.angular_speed);
   direction_ui = target_ui.angular_speed < 0 ? 1 : 0;
   camera_ui = engine->Intrinsics();
@@ -199,16 +213,18 @@ void AddViewerMenu(mujoco::Simulate* sim) {
   sim->ui1.nsect = 0;
   control_section = 0;
   target_section = 1;
-  camera_section = 2;
-  stats_section = 3;
-  performance_section = 4;
+  outpost_section = 2;
+  camera_section = 3;
+  stats_section = 4;
+  performance_section = 5;
   mjuiDef definition[] = {
       {mjITEM_SECTION, "AUTO AIM LAB", 1},
       {mjITEM_SELECT, "Control mode", 1, &mode_ui, "MANUAL\nAUTO (ROS2)"},
       {mjITEM_SELECT, "Camera view", 1, &view_ui, "Orbit\nGimbal"},
       {mjITEM_STATIC, "Angles [rad]", 1, nullptr, "Pitch 0.000\nYaw 0.000"},
       {mjITEM_STATIC, "Keys", 1, nullptr, "WASD move / QE up\nArrows / RMB aim\nF view / LMB fire"},
-      {mjITEM_SECTION, "ARMOR TARGET", 1},
+      {mjITEM_CHECKINT, "Continuous yaw", 1, &yaw_continuous_ui},
+      {mjITEM_SECTION, "ARMOR (4 PLATES)", 1},
       {mjITEM_EDITNUM, "Center XYZ [m]", 1, target_ui.center.data(), "3"},
       {mjITEM_SLIDERNUM, "r1 [m]", 1, &target_ui.r1, "0.08 5"},
       {mjITEM_SLIDERNUM, "r2 [m]", 1, &target_ui.r2, "0.08 5"},
@@ -219,6 +235,23 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SELECT, "Direction", 1, &direction_ui, "CCW (+Z)\nCW (-Z)"},
       {mjITEM_BUTTON, "Reset heading", 1},
       {mjITEM_STATIC, "Geometry", 1, nullptr, "Pairs: 0,2 / 1,3\nZ + h1/h2 [m]\nNormal up 15 deg"},
+      {mjITEM_SLIDERNUM, "Normal up [deg]", 1, &armor_tilt_ui, "-60 60"},
+      {mjITEM_SLIDERNUM, "LED white mix", 1, &lamp_white_ui, "0 1"},
+      {mjITEM_EDITNUM, "Heading [rad]", 1, &target_ui.angle, "1"},
+      {mjITEM_SECTION, "OUTPOST (3 PLATES)", 1},
+      {mjITEM_EDITNUM, "Center XYZ [m]", 1, outpost_ui.center.data(), "3"},
+      {mjITEM_SLIDERNUM, "Diameter [m]", 1, &outpost_diameter_ui, "0.16 10"},
+      {mjITEM_SLIDERNUM, "Height 0 [m]", 1, &outpost_ui.h1, "0.08 5"},
+      {mjITEM_SLIDERNUM, "Height 1 [m]", 1, &outpost_ui.h2, "0.08 5"},
+      {mjITEM_SLIDERNUM, "Height 2 [m]", 1, &outpost_ui.h3, "0.08 5"},
+      {mjITEM_SLIDERNUM, "Plane / floor [deg]", 1, &outpost_plane_ui, "30 90"},
+      {mjITEM_SELECT, "Color", 1, &outpost_ui.color, "Red\nBlue"},
+      {mjITEM_SLIDERNUM, "Speed [rad/s]", 1, &outpost_speed_ui, "0 30"},
+      {mjITEM_SELECT, "Direction", 1, &outpost_direction_ui, "CCW (+Z)\nCW (-Z)"},
+      {mjITEM_BUTTON, "Reset heading", 1},
+      {mjITEM_SLIDERNUM, "LED white mix", 1, &outpost_ui.light_whiteness, "0 1"},
+      {mjITEM_EDITNUM, "Heading [rad]", 1, &outpost_ui.angle, "1"},
+      {mjITEM_STATIC, "Geometry", 1, nullptr, "120 deg spacing\nPlate centre heights\nNormal faces out/down"},
       {mjITEM_SECTION, "CAMERA / LIGHT", 0},
       {mjITEM_EDITNUM, "fx / fy [px]", 1, &camera_ui.fx, "2 1 100000 1 100000"},
       {mjITEM_EDITNUM, "cx / cy [px]", 1, &camera_ui.cx, "2"},
@@ -226,7 +259,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SLIDERNUM, "Scene light", 1, &brightness_ui, "0 3"},
       {mjITEM_CHECKINT, "Black sky", 1, &dark_sky_ui},
       {mjITEM_SLIDERNUM, "Floor / scene color", 1, &albedo_ui, "0 1"},
-      {mjITEM_SLIDERNUM, "LED white mix", 1, &lamp_white_ui, "0 1"},
+      {mjITEM_STATIC, "LED controls", 1, nullptr, "See ARMOR / OUTPOST"},
       {mjITEM_STATIC, "Camera model", 1, nullptr, "Rectified pinhole RGB\nK alters projection"},
       {mjITEM_STATIC, "Status", 1, nullptr, "Ready"},
       {mjITEM_CHECKINT, "Shader camera", 1, &shader_ui},
@@ -238,10 +271,11 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SLIDERNUM, "ROS bullet opacity", 1, &projectile_opacity_ui, "0 1"},
       {mjITEM_SECTION, "HIT STATISTICS", 1},
       {mjITEM_STATIC, "Session", 1, nullptr, "Fired 0\nArmor hits 0\nHit rate 0.00%"},
-      {mjITEM_STATIC, "Plate 0/1/2/3", 1, nullptr, "0 / 0 / 0 / 0"},
+      {mjITEM_STATIC, "Armor 0/1/2/3", 1, nullptr, "0 / 0 / 0 / 0"},
       {mjITEM_STATIC, "Pool", 1, nullptr, "Active 0\nDropped 0"},
       {mjITEM_BUTTON, "Reset statistics", 1},
       {mjITEM_CHECKINT, "Show charts", 1, &plots_ui},
+      {mjITEM_STATIC, "Outpost 0/1/2", 1, nullptr, "0 / 0 / 0"},
       {mjITEM_SECTION, "PERFORMANCE", 1},
       {mjITEM_STATIC, "Camera", 1, nullptr, "Publish FPS 0\nCapture FPS 0\nLatency 0 ms\nGPU drops 0\nPublish drops 0"},
       {mjITEM_STATIC, "Stages", 1, nullptr, "Snapshot 0 ms\nScene 0 ms\nGPU render 0 ms\nRender submit 0 ms"},
@@ -250,6 +284,13 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_CHECKINT, "Show perf plots", 1, &performance_plots_ui},
       {mjITEM_END}};
   mjui_add(&sim->ui1, definition);
+  // Enabling a module changes topology and requires restart; disable absent controls.
+  for (int section : {target_section, outpost_section}) {
+    if ((section == target_section && engine->Target()) ||
+        (section == outpost_section && engine->Outpost())) continue;
+    auto& group = sim->ui1.sect[section];
+    for (int i = 0; i < group.nitem; ++i) group.item[i].state = 0;
+  }
   Theme(sim->ui0);
   Theme(sim->ui1);
   sim->ui0_enable = 0;
@@ -268,10 +309,23 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
     if (item->sectionid == control_section) {
       if (item->itemid == 0) engine->SetMode(static_cast<ControlMode>(mode_ui));
       if (item->itemid == 1) ChangeView(sim);
+      if (item->itemid == 4) engine->SetYawContinuous(yaw_continuous_ui != 0);
     } else if (item->sectionid == target_section && engine->Target()) {
-      target_ui.angle = item->itemid == 8 ? 0 : engine->Target()->Settings().angle;
+      if (item->itemid != 12)
+        target_ui.angle = item->itemid == 8 ? 0 : engine->Target()->Settings().angle;
+      target_ui.tilt = armor_tilt_ui * mjPI / 180;
+      target_ui.light_whiteness = lamp_white_ui;
       target_ui.angular_speed = direction_ui ? -speed_ui : speed_ui;
       engine->Target()->Configure(target_ui, engine->Data());
+      std::snprintf(sim->ui1.sect[target_section].item[9].multi.name[2], mjMAXUINAME,
+                    "Normal up %.1f deg", armor_tilt_ui);
+    } else if (item->sectionid == outpost_section && engine->Outpost()) {
+      if (item->itemid != 11)
+        outpost_ui.angle = item->itemid == 9 ? 0 : engine->Outpost()->Settings().angle;
+      outpost_ui.r1 = outpost_ui.r2 = outpost_diameter_ui / 2;
+      outpost_ui.tilt = (outpost_plane_ui - 90) * mjPI / 180;
+      outpost_ui.angular_speed = outpost_direction_ui ? -outpost_speed_ui : outpost_speed_ui;
+      engine->Outpost()->Configure(outpost_ui, engine->Data());
     } else if (item->sectionid == camera_section) {
       if (item->itemid == 2) {
         engine->SetIntrinsics(camera_ui);
@@ -280,10 +334,6 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
       if (item->itemid == 3) engine->SetBrightness(brightness_ui);
       if (item->itemid == 4) engine->Environment().SetDarkSky(dark_sky_ui != 0);
       if (item->itemid == 5) engine->Environment().SetAlbedo(albedo_ui);
-      if (item->itemid == 6 && engine->Target()) {
-        engine->Target()->SetLightWhiteness(lamp_white_ui);
-        target_ui.light_whiteness = lamp_white_ui;
-      }
       if (item->itemid >= 9 && item->itemid <= 13 && sensor)
         sensor->SetRendering(shader_ui != 0, shadows_ui != 0, exposure_ui,
                              bloom_ui, lamp_intensity_ui);
@@ -371,6 +421,11 @@ void UpdateViewerInput(mujoco::Simulate* sim) {
                 (unsigned long long)state.plate_hits[0], (unsigned long long)state.plate_hits[1],
                 (unsigned long long)state.plate_hits[2], (unsigned long long)state.plate_hits[3]);
   auto& pool = sim->ui1.sect[stats_section].item[2].multi;
+  auto& outpost_counts = sim->ui1.sect[stats_section].item[5].multi;
+  std::snprintf(outpost_counts.name[0], mjMAXUINAME, "%llu / %llu / %llu",
+                static_cast<unsigned long long>(state.outpost_plate_hits[0]),
+                static_cast<unsigned long long>(state.outpost_plate_hits[1]),
+                static_cast<unsigned long long>(state.outpost_plate_hits[2]));
   std::snprintf(pool.name[0], mjMAXUINAME, "Active %d", state.active_projectiles);
   std::snprintf(pool.name[1], mjMAXUINAME, "Dropped %llu",
                 (unsigned long long)state.pool_exhausted_count);

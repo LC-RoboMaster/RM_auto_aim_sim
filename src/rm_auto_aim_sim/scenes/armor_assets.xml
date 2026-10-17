@@ -6,6 +6,7 @@
     <mesh name="target_small_num2_plane" file="armor/small_num2_plane.obj" />
     <texture name="target_number" type="2d" file="armor/small_num2.png" />
     <material name="target_black" rgba="0.05 0.05 0.05 1" specular="0.25" />
+    <material name="outpost_glow" rgba="1 0.03 0.02 1" emission="1" specular="0" />
     <material name="target_glow" rgba="1 0.03 0.02 1" emission="1" specular="0" />
     <material name="target_sticker" texture="target_number" rgba="1 1 1 1" specular="0" />
   </asset>

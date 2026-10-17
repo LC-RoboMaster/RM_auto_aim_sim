@@ -21,6 +21,11 @@ ProjectilePool::ProjectilePool(const Config& config, const mjModel* model)
     const int geom = mj_name2id(model, mjOBJ_GEOM, ("armor_hitbox_" + std::to_string(i)).c_str());
     if (geom >= 0) geom_to_armor_[geom] = i;
   }
+  geom_to_outpost_.assign(model->ngeom, -1);
+  for (int i = 0; i < 3; ++i) {
+    const int geom = mj_name2id(model, mjOBJ_GEOM, ("outpost_hitbox_" + std::to_string(i)).c_str());
+    if (geom >= 0) geom_to_outpost_[geom] = i;
+  }
   hits_.reserve(config.projectile_pool_size);
 }
 
@@ -102,11 +107,15 @@ void ProjectilePool::AfterStep(mjData* data) {
       HitEvent event;
       event.shot_id = slot.shot_id;
       event.armor_index = geom_to_armor_[contact.geom[1 - side]];
+      const int outpost_index = geom_to_outpost_[contact.geom[1 - side]];
+      if (outpost_index >= 0) event.armor_index = outpost_index;
       event.armor_hit = event.armor_index >= 0;
+      event.target_type = event.armor_hit ? (outpost_index >= 0 ? "outpost" : "armor") : "environment";
       // Only the first contact counts. Old in-flight shots cannot contaminate a reset session.
       if (event.armor_hit && slot.statistics_epoch == statistics_epoch_) {
         ++armor_hits_;
-        ++plate_hits_[event.armor_index];
+        if (outpost_index >= 0) ++outpost_plate_hits_[outpost_index];
+        else ++plate_hits_[event.armor_index];
       }
       event.time = data->time;
       event.geom_name = other ? other : "unnamed";
@@ -120,6 +129,7 @@ void ProjectilePool::AfterStep(mjData* data) {
 void ProjectilePool::ResetStatistics() {
   statistics_shots_ = armor_hits_ = 0;
   plate_hits_.fill(0);
+  outpost_plate_hits_.fill(0);
   ++statistics_epoch_;
 }
 

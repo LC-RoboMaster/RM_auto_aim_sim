@@ -32,6 +32,7 @@
   </worldbody>
   <include file="armor_assets.xml" />
   <include file="targets.xml" />
+  <include file="outpost.xml" />
   <sensor>
     <jointpos name="gimbal_yaw_angle" joint="yaw_joint"/>
     <jointpos name="gimbal_pitch_angle" joint="pitch_joint"/>

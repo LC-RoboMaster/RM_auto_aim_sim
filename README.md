@@ -11,6 +11,19 @@
 当前默认 1280×1024 / 150 FPS 请求，viewer 预览上限 30 FPS；采集和 ROS 发布分线程。
 用 `ros2 run rm_auto_aim_sim camera_rate_probe --seconds 10 --min-fps 145` 验收实际接收率。
 
+## 三板前哨站与连续 yaw
+
+新增 **OUTPOST（前哨站）**：三块装甲板中心位于直径 550 mm 的圆周，俯视间隔 120°，
+中心距地面分别为 1114 / 1216 / 1318 mm，数字面朝外下倾（与地面夹角 75°）。
+与 **ARMOR（四板装甲板）** 分组独立设置位置、尺寸、高度、颜色、旋转方向和速度。
+`config/sim.yaml` 使用 `armor_*` / `outpost_*`；旧 `target_*` 参数仍兼容读取。
+示例默认同时显示两类目标；`armor_enabled` / `outpost_enabled` 可分别关闭（重启生效）。
+
+云台默认 `yaw_continuous: true`，允许连续多圈旋转，ROS yaw 反馈范围 [-π,π]。
+例如 +179° → -179° 按最短路径转 +2°。UI 的 Continuous yaw 可切换；
+`yaw_min` / `yaw_max` 仅在连续模式关闭时生效，pitch 仍保留限位。
+参数与 UI 说明见 [CONFIGURATION.md](src/rm_auto_aim_sim/docs/CONFIGURATION.md)。
+
 ## v0.2：RMUC 场地、旋转装甲目标与测试面板
 
 新增四板靶标（r1/r2、h1/h2、XYZ、15° 上倾、红蓝切换、可调正反转）、
@@ -159,7 +172,7 @@ PBO 的时间，`PBO map/copy` 是 CPU 取回缓冲的时间；`Render submit` �
 | 发布 | `/tf`、`/tf_static` | `tf2_msgs/msg/TFMessage` | 动态/固定变换 |
 | 发布 | `/clock` | `rosgraph_msgs/msg/Clock` | MuJoCo 仿真时间 |
 | 发布 | `/sim/shot_count` | `std_msgs/msg/UInt64` | 累计成功发射数；reset 后归零 |
-| 发布 | `/sim/projectile_hit` | `std_msgs/msg/String` | 每颗弹丸首次接触 JSON；尚不是装甲板命中判定 |
+| 发布 | `/sim/projectile_hit` | `std_msgs/msg/String` | 每颗弹丸首次接触 JSON；含 armor/outpost 分类及板号 |
 | 发布 | `/sim/camera_fps` | `std_msgs/msg/Float64` | 相机最近两秒的实际墙钟采集 FPS |
 | 订阅 | `/gimbal/target_pitch` | `std_msgs/msg/Float64` | pitch **绝对目标角度**，rad |
 | 订阅 | `/gimbal/target_yaw` | `std_msgs/msg/Float64` | yaw **绝对目标角度**，rad |

@@ -19,6 +19,7 @@ class CommandMailbox {
   void SetMode(ControlMode mode);
   void SetPitch(double angle);
   void SetYaw(double angle);
+  void ClearYaw();
   void SetFire(bool enabled);
   void Apply(const Config& config, double current_pitch, double current_yaw, double& target_pitch,
              double& target_yaw, bool& fire);
@@ -52,6 +53,9 @@ class Engine {
   mjData* Data() const { return data_; }
   int CameraId() const { return camera_id_; }
   ArmorTarget* Target() { return target_.get(); }
+  ArmorTarget* Outpost() { return outpost_.get(); }
+  void SetYawContinuous(bool enabled);
+  bool YawContinuous() const { return yaw_continuous_; }
   void ResetStatistics() { pool_->ResetStatistics(); }
   void SetIntrinsics(const CameraIntrinsics& k);
   CameraIntrinsics Intrinsics() const;
@@ -68,7 +72,8 @@ class Engine {
   mjModel* model_ = nullptr;
   mjData* data_ = nullptr;
   std::unique_ptr<ProjectilePool> pool_;
-  std::unique_ptr<ArmorTarget> target_;
+  std::unique_ptr<ArmorTarget> target_, outpost_;
+  bool yaw_continuous_ = true;
   std::unique_ptr<EnvironmentAppearance> environment_;
   std::vector<float> original_diffuse_, original_ambient_, original_specular_;
   mjVisual original_visual_{};

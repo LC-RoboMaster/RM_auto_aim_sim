@@ -97,6 +97,10 @@ if(BUILD_TESTING)
   target_link_libraries(aim_lab_tests PRIVATE aim_core)
   add_test(NAME armor_target_statistics COMMAND aim_lab_tests
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.yaml")
+  add_executable(aim_outpost_yaw_tests tests/outpost_yaw_tests.cpp)
+  target_link_libraries(aim_outpost_yaw_tests PRIVATE aim_core)
+  add_test(NAME outpost_mechanics_continuous_yaw COMMAND aim_outpost_yaw_tests
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.yaml")
   add_executable(aim_config_tests tests/config_tests.cpp)
   target_link_libraries(aim_config_tests PRIVATE aim_core)
   add_test(NAME configuration_contract COMMAND aim_config_tests
@@ -106,7 +110,7 @@ if(BUILD_TESTING)
   add_test(NAME bounded_camera_publication COMMAND aim_publisher_tests)
   set_tests_properties(bounded_camera_publication PROPERTIES TIMEOUT 10)
   add_library(aim_render_probe SHARED tests/render_probe.cpp tests/async_render_probe.cpp
-    tests/camera_benchmark.cpp)
+    tests/camera_benchmark.cpp tests/outpost_render_probe.cpp)
   target_link_libraries(aim_render_probe PRIVATE aim_camera)
 endif()
 if(ENABLE_ROS2)

@@ -21,6 +21,14 @@ Config Config::Load(const std::string& path) {
   if (node[#name]) config.name = node[#name].as<type>();
 #include "rm_auto_aim_sim/config_fields.def"
 #undef AIM_PARAMETER
+#define AIM_ALIAS(old_name, new_name) \
+  known.insert(#old_name); \
+  if (node[#old_name]) { \
+    if (node[#new_name]) throw std::runtime_error("Conflicting aliases: " #old_name " / " #new_name); \
+    config.new_name = node[#old_name].as<decltype(config.new_name)>(); \
+  }
+#include "rm_auto_aim_sim/config_aliases.def"
+#undef AIM_ALIAS
   for (const auto& entry : node) {
     const auto key = entry.first.as<std::string>();
     if (!known.count(key)) throw std::runtime_error("Unknown parameter: " + key);
@@ -97,20 +105,31 @@ void Config::Validate() const {
   require(
       std::isfinite(lighting_brightness) && lighting_brightness >= 0 && lighting_brightness <= 3,
       "lighting_brightness must be in [0,3]");
-  require(target_color == "red" || target_color == "blue", "target_color: red or blue");
-  require(positive(target_r1) && positive(target_r2) && target_r1 >= .08 && target_r1 <= 5 &&
-              target_r2 >= .08 && target_r2 <= 5 && target_h1 >= .08 && target_h1 <= 5 &&
-              target_h2 >= .08 && target_h2 <= 5 && std::isfinite(target_h1) &&
-              std::isfinite(target_h2) && std::isfinite(target_x) && std::isfinite(target_y) &&
-              std::isfinite(target_z) && std::isfinite(target_angular_speed) &&
-              std::abs(target_angular_speed) <= 30 && std::isfinite(target_initial_angle) &&
-              std::isfinite(target_tilt_deg) && std::abs(target_tilt_deg) <= 60,
+  require(armor_color == "red" || armor_color == "blue", "armor_color: red or blue");
+  require(positive(armor_r1) && positive(armor_r2) && armor_r1 >= .08 && armor_r1 <= 5 &&
+              armor_r2 >= .08 && armor_r2 <= 5 && armor_h1 >= .08 && armor_h1 <= 5 &&
+              armor_h2 >= .08 && armor_h2 <= 5 && std::isfinite(armor_h1) &&
+              std::isfinite(armor_h2) && std::isfinite(armor_x) && std::isfinite(armor_y) &&
+              std::isfinite(armor_z) && std::isfinite(armor_angular_speed) &&
+              std::abs(armor_angular_speed) <= 30 && std::isfinite(armor_initial_angle) &&
+              std::isfinite(armor_tilt_deg) && std::abs(armor_tilt_deg) <= 60,
           "Target parameters invalid");
   require(std::isfinite(environment_albedo) && environment_albedo >= 0 && environment_albedo <= 1,
           "environment_albedo must be in [0,1]");
-  require(std::isfinite(target_light_whiteness) && target_light_whiteness >= 0 &&
-              target_light_whiteness <= 1,
-          "target_light_whiteness must be in [0,1]");
+  require(std::isfinite(armor_light_whiteness) && armor_light_whiteness >= 0 &&
+              armor_light_whiteness <= 1,
+          "armor_light_whiteness must be in [0,1]");
+  require(std::isfinite(outpost_x) && std::isfinite(outpost_y) && std::isfinite(outpost_z) &&
+              std::isfinite(outpost_diameter) && outpost_diameter >= .16 && outpost_diameter <= 10 &&
+              positive(outpost_h1) && outpost_h1 >= .08 && outpost_h1 <= 5 &&
+              positive(outpost_h2) && outpost_h2 >= .08 && outpost_h2 <= 5 &&
+              positive(outpost_h3) && outpost_h3 >= .08 && outpost_h3 <= 5 &&
+              std::isfinite(outpost_plane_angle_deg) && outpost_plane_angle_deg >= 30 &&
+              outpost_plane_angle_deg <= 90 && std::isfinite(outpost_angular_speed) &&
+              std::abs(outpost_angular_speed) <= 30 && std::isfinite(outpost_initial_angle) &&
+              (outpost_color == "red" || outpost_color == "blue") &&
+              std::isfinite(outpost_light_whiteness) && outpost_light_whiteness >= 0 &&
+              outpost_light_whiteness <= 1, "Outpost parameters invalid");
   std::set<std::string> frames;
   for (const auto& frame : {frame_world, frame_base, frame_yaw, frame_pitch, frame_camera,
                             frame_camera_optical, frame_muzzle}) {

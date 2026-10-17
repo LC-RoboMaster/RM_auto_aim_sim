@@ -19,6 +19,7 @@ struct HitEvent {
   double time = 0;
   bool armor_hit = false;
   int armor_index = -1;
+  std::string target_type = "environment";
   std::string geom_name;
   std::array<double, 3> position{};
 };
@@ -35,6 +36,7 @@ struct StateFrame {
   bool dark_sky = false;
   std::uint64_t statistics_shots = 0, armor_hits = 0, statistics_epoch = 0;
   std::array<std::uint64_t, 4> plate_hits{};
+  std::array<std::uint64_t, 3> outpost_plate_hits{};
   double hit_rate = 0;
   ControlMode mode = ControlMode::kManual;
   Pose base, yaw_link, pitch_link, camera_link, optical, muzzle;

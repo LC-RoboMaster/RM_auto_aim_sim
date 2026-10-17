@@ -93,6 +93,15 @@ RosBridge::RosBridge(int argc, char** argv, Config& config) {
   rcl_interfaces::msg::ParameterDescriptor descriptor;
   descriptor.read_only = true;
   descriptor.description = "Startup configuration; edit YAML and restart to change it.";
+  // Also accept legacy ROS parameter files/CLI overrides, rejecting ambiguity.
+  const auto& overrides = impl_->node->get_node_parameters_interface()->get_parameter_overrides();
+#define AIM_ALIAS(old_name, new_name) \
+  if (overrides.count(#old_name)) { \
+    if (overrides.count(#new_name)) throw std::runtime_error("Conflicting aliases: " #old_name " / " #new_name); \
+    config.new_name = impl_->node->declare_parameter<decltype(config.new_name)>(#old_name, config.new_name, descriptor); \
+  }
+#include "rm_auto_aim_sim/config_aliases.def"
+#undef AIM_ALIAS
 #define AIM_PARAMETER(type, name, value) \
   config.name = impl_->node->declare_parameter<type>(#name, config.name, descriptor);
 #include "rm_auto_aim_sim/config_fields.def"
@@ -195,7 +204,9 @@ void RosBridge::PublishState(const StateFrame& state, const std::vector<HitEvent
   totals << "{\"epoch\":" << state.statistics_epoch << ",\"shots\":" << state.statistics_shots
          << ",\"hits\":" << state.armor_hits << ",\"hit_rate\":" << state.hit_rate
          << ",\"plate_hits\":[" << state.plate_hits[0] << ',' << state.plate_hits[1] << ','
-         << state.plate_hits[2] << ',' << state.plate_hits[3] << "]}";
+         << state.plate_hits[2] << ',' << state.plate_hits[3]
+         << "],\"outpost_plate_hits\":[" << state.outpost_plate_hits[0] << ','
+         << state.outpost_plate_hits[1] << ',' << state.outpost_plate_hits[2] << "]}";
   std_msgs::msg::String statistics;
   statistics.data = totals.str();
   impl_->statistics->publish(statistics);
@@ -203,6 +214,7 @@ void RosBridge::PublishState(const StateFrame& state, const std::vector<HitEvent
     std::ostringstream json;
     json << std::setprecision(12) << "{\"shot_id\":" << hit.shot_id << ",\"sim_time\":" << hit.time
          << ",\"armor_hit\":" << (hit.armor_hit ? "true" : "false")
+         << ",\"target_type\":" << JsonString(hit.target_type)
          << ",\"armor_index\":" << hit.armor_index << ",\"geom\":" << JsonString(hit.geom_name)
          << ",\"position\":[" << hit.position[0] << ',' << hit.position[1] << ',' << hit.position[2]
          << "]}";

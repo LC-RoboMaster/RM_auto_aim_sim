@@ -14,7 +14,7 @@ extern "C" int RunRenderProbe(const char* config_path, const char* output_path) 
     auto config = rm_auto_aim_sim::Config::Load(config_path);
     config.scene_path =
         (std::filesystem::path(config.scene_path).parent_path() / "arena.xml").string();
-    config.target_enabled = false;
+    config.armor_enabled = false;
     config.camera_use_intrinsics = true;
     config.camera_fx = 800;
     config.camera_fy = 910;
@@ -230,7 +230,7 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     config.lighting_brightness = .03;
     config.dark_sky = true;
     config.environment_albedo = 0;
-    config.target_light_whiteness = .65;
+    config.armor_light_whiteness = .65;
     config.camera_bloom = .9;
     config.camera_lamp_intensity = 8;
     aim::Engine engine(config);
@@ -240,7 +240,7 @@ extern "C" int RunShaderRenderProbe(const char* config_path, const char* output_
     settings.center = {-3, 0, 0};
     settings.h1 = settings.h2 = .99;
     settings.color = 0;
-    settings.light_whiteness = config.target_light_whiteness;
+    settings.light_whiteness = config.armor_light_whiteness;
     engine.Target()->Configure(settings, engine.Data());
     aim::CameraRenderer renderer(engine.Model(), engine.CameraId(), config.camera_width,
                                  config.camera_height);
