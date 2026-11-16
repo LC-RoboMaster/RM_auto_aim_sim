@@ -16,6 +16,6 @@ else
   fi
   /usr/bin/python3 -m colcon build --symlink-install --packages-select rm_auto_aim_sim \
     --cmake-args -DCMAKE_BUILD_TYPE=Release -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCONDA_PYTHON="$mujoco_python" \
-      -DPython3_EXECUTABLE=/usr/bin/python3 -DPYTHON_EXECUTABLE=/usr/bin/python3
+      -DPython3_EXECUTABLE=/usr/bin/python3
   ctest --test-dir build/rm_auto_aim_sim --output-on-failure 
 fi

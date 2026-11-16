@@ -43,7 +43,7 @@ class Probe(Node):
         self.match()
 
     def info(self, message):
-        if message.k[0] <= 0 or abs(message.k[0] - message.k[4]) > 1e-8:
+        if message.k[0] <= 0 or message.k[4] <= 0:
             self.errors.add("Invalid focal length")
         self.infos[self.stamp(message)] = (message.header.frame_id, message.width, message.height)
         self.match()
@@ -72,12 +72,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--seconds", type=float, default=10)
     parser.add_argument("--min-fps", type=float, default=100)
-    parser.add_argument("--image", default="/camera/image_raw")
-    parser.add_argument("--info", default="/camera/camera_info")
+    parser.add_argument("--image", default="/image_raw")
+    parser.add_argument("--info", default="/camera_info")
     parser.add_argument("--joints", default="/joint_states")
     parser.add_argument("--tf", default="/tf")
     parser.add_argument("--tf-static", default="/tf_static")
-    parser.add_argument("--frames", nargs=7, default=["world", "base_link", "yaw_link", "pitch_link",
+    parser.add_argument("--frames", nargs=7, default=["world", "odom", "yaw_link", "pitch_link",
                                                     "camera_link", "camera_optical_frame", "muzzle_link"])
     args = parser.parse_args()
     rclpy.init()

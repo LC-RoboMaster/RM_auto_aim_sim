@@ -17,3 +17,11 @@ license and attribution are embedded in lodepng.cpp/lodepng.h; those files are u
 
 MuJoCo, GLFW, yaml-cpp and ROS2 are linked dependencies installed by the user;
 their binaries are not included in this source archive.
+
+## 装甲板与场地
+
+- 装甲外观来自用户上传的 `mujoco_models.zip` 中 `rm21_armor_module`；
+  使用的原文件与来源说明位于 `scenes/armor/README.md`。
+- RMUC 接口参考 https://github.com/ling37luo/rmuc2026-mujoco ，验证版本
+  `3db8efe6ebd478c1a6da42aaa4e2323c26129b8a`。本仓库仅实现导入接口，
+  不包含官方 STEP/PDF 或派生场地资产；遵循上游 `ASSET_POLICY.md`。

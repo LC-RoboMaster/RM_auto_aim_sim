@@ -3,7 +3,7 @@
     <!-- Visual geoms are non-colliding; the base is a user-positioned test fixture. -->
     <geom type="box" size="0.22 0.20 0.08" rgba="0.2 0.24 0.30 1" contype="0" conaffinity="0"/>
     <body name="yaw_link" pos="0 0 0.12" gravcomp="1">
-      <joint name="yaw_joint" type="hinge" axis="0 0 1" limited="true" range="-3.141593 3.141593" damping="0.1"/>
+      <joint name="yaw_joint" type="hinge" axis="0 0 1" limited="false" damping="0.1"/>
       <geom type="cylinder" size="0.12 0.09" mass="1.0" rgba="0.32 0.4 0.48 1" contype="0" conaffinity="0"/>
       <body name="pitch_link" pos="0 0 0.14" gravcomp="1">
         <!-- Rotation about -Y makes positive pitch point the barrel upward. -->

@@ -3,104 +3,179 @@
 #include <GLFW/glfw3.h>
 
 #include <chrono>
+#include <cmath>
+#include <ctime>
+#include <fstream>
 #include <iostream>
 #include <stdexcept>
+#ifdef __linux__
+#include <unistd.h>
+#endif
 
 #include "rm_auto_aim_sim/camera_renderer.hpp"
 
-namespace rm_auto_aim_sim
-{
-    SensorWorker::SensorWorker(const Engine& engine, Snapshot snapshot, Publish publish)
-        : config_(engine.GetConfig()),
-          camera_id_(engine.CameraId()),
-          snapshot_(std::move(snapshot)),
-          publish_(std::move(publish))
-    {
-        try
-        {
-            model_ = mj_copyModel(nullptr, engine.Model());
-            if (!model_) throw std::runtime_error("Cannot allocate camera model");
-            data_ = mj_makeData(model_);
-            if (!data_) throw std::runtime_error("Cannot allocate camera snapshot");
-            if (!glfwInit()) throw std::runtime_error("GLFW init failed: display unavailable");
-            glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-            glfwWindowHint(GLFW_SAMPLES, 0);
-            window_ = glfwCreateWindow(32, 32, "RM sensor context", nullptr, nullptr);
-            glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
-            if (!window_) throw std::runtime_error("Cannot create camera OpenGL context");
-        }
-        catch (...)
-        {
-            if (window_) glfwDestroyWindow(window_);
-            if (data_) mj_deleteData(data_);
-            if (model_) mj_deleteModel(model_);
-            throw;
-        }
-    }
+namespace rm_auto_aim_sim {
+namespace {
+double WallTime() {
+  return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+double RssMiB() {
+#ifdef __linux__
+  std::ifstream statm("/proc/self/statm");
+  long pages = 0, resident = 0;
+  if (statm >> pages >> resident)
+    return static_cast<double>(resident) * sysconf(_SC_PAGESIZE) / (1024.0 * 1024.0);
+#endif
+  return 0;
+}
+}  // namespace
+SensorWorker::SensorWorker(const Engine& engine, Snapshot snapshot, Publish publish)
+    : config_(engine.GetConfig()),
+      camera_id_(engine.CameraId()),
+      snapshot_(std::move(snapshot)),
+      publisher_(std::move(publish)) {
+  SetProjectileOpacity(config_.camera_projectile_opacity);
+  SetRendering(config_.camera_shader, config_.camera_shadows, config_.camera_exposure,
+               config_.camera_bloom, config_.camera_lamp_intensity);
+  try {
+    model_ = mj_copyModel(nullptr, engine.Model());
+    if (!model_) throw std::runtime_error("Cannot allocate camera model");
+    data_ = mj_makeData(model_);
+    if (!data_) throw std::runtime_error("Cannot allocate camera snapshot");
+    if (!glfwInit()) throw std::runtime_error("GLFW init failed: display unavailable");
+    glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_SAMPLES, 0);
+    window_ = glfwCreateWindow(32, 32, "RM sensor context", nullptr, nullptr);
+    glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
+    if (!window_) throw std::runtime_error("Cannot create camera OpenGL context");
+  } catch (...) {
+    if (window_) glfwDestroyWindow(window_);
+    if (data_) mj_deleteData(data_);
+    if (model_) mj_deleteModel(model_);
+    throw;
+  }
+}
 
-    SensorWorker::~SensorWorker()
-    {
-        Stop();
-        if (window_) glfwDestroyWindow(window_);
-        mj_deleteData(data_);
-        mj_deleteModel(model_);
-    }
+SensorWorker::~SensorWorker() {
+  Stop();
+  if (window_) glfwDestroyWindow(window_);
+  mj_deleteData(data_);
+  mj_deleteModel(model_);
+}
 
-    void SensorWorker::Start() { thread_ = std::thread(&SensorWorker::Run, this); }
+void SensorWorker::Start() {
+  publisher_.Start();
+  thread_ = std::thread(&SensorWorker::Run, this);
+}
+void SensorWorker::SetProjectileOpacity(double opacity) {
+  if (!std::isfinite(opacity) || opacity < 0 || opacity > 1)
+    throw std::invalid_argument("camera_projectile_opacity must be in [0,1]");
+  projectile_opacity_.store(opacity);
+}
 
-    void SensorWorker::Stop()
-    {
-        stop_.store(true);
-        if (thread_.joinable()) thread_.join();
-    }
+void SensorWorker::SetRendering(bool shader, bool shadows, double exposure, double bloom,
+                                double lamp_intensity) {
+  shader_.store(shader);
+  shadows_.store(shadows);
+  exposure_.store(exposure);
+  bloom_.store(bloom);
+  lamp_intensity_.store(lamp_intensity);
+}
+CameraMetrics SensorWorker::Metrics() const {
+  const std::lock_guard<std::mutex> lock(metrics_mutex_);
+  auto result = metrics_;
+  const auto published = publisher_.Metrics();
+  result.fps = published.fps;
+  result.publish_ms = published.publish_ms;
+  result.latency_ms = published.latency_ms;
+  result.publish_dropped_frames = published.dropped;
+  return result;
+}
 
-    void SensorWorker::Run()
-    {
-        using Clock = std::chrono::steady_clock;
-        glfwMakeContextCurrent(window_);
-        try
-        {
-            CameraRenderer renderer(model_, camera_id_, config_.camera_width, config_.camera_height);
-            CameraFrame frame;
-            const auto period = std::chrono::duration_cast<Clock::duration>(
-                std::chrono::duration<double>(1.0 / config_.camera_fps));
-            auto deadline = Clock::now();
-            auto metric_start = deadline;
-            std::size_t frame_count = 0;
-            double last_time = -1;
-            double last_fps = 0;
-            while (!stop_.load())
-            {
-                frame.state = snapshot_(data_); // Short physics mutex hold; GPU render runs unlocked.
-                if (frame.state.time != last_time)
-                {
-                    renderer.Render(data_, frame);
-                    last_time = frame.state.time;
-                    ++frame_count;
-                    const auto now = Clock::now();
-                    const double elapsed = std::chrono::duration<double>(now - metric_start).count();
-                    if (elapsed >= 2.0)
-                    {
-                        last_fps = frame_count / elapsed;
-                        std::cout << "[camera] actual " << last_fps << " FPS, requested " << config_.camera_fps
-                            << '\n';
-                        frame_count = 0;
-                        metric_start = now;
-                    }
-                    frame.wall_fps = last_fps;
-                    publish_(frame);
-                }
-                deadline += period;
-                // Drop overdue captures instead of building a backlog of stale images.
-                if (deadline < Clock::now()) deadline = Clock::now();
-                std::this_thread::sleep_until(deadline);
-            }
-        }
-        catch (const std::exception& error)
-        {
-            std::cerr << "[camera] " << error.what() << '\n';
-            failed_.store(true);
-        }
-        glfwMakeContextCurrent(nullptr);
+void SensorWorker::Stop() {
+  stop_.store(true);
+  if (thread_.joinable()) thread_.join();
+  publisher_.Stop();
+}
+
+void SensorWorker::Run() {
+  using Clock = std::chrono::steady_clock;
+  glfwMakeContextCurrent(window_);
+  try {
+    CameraRenderer renderer(model_, camera_id_, config_.camera_width, config_.camera_height);
+    CameraFrame frame;
+    CameraFrame ready;
+    CameraMetrics metrics;
+    const auto period = std::chrono::duration_cast<Clock::duration>(
+        std::chrono::duration<double>(1.0 / config_.camera_fps));
+    auto deadline = Clock::now();
+    auto metric_start = deadline;
+    std::size_t frame_count = 0;
+    double last_time = -1;
+    double last_fps = 0;
+    auto cpu_start = deadline;
+    std::clock_t process_start = std::clock();
+    while (!stop_.load() && !publisher_.Failed()) {
+      const auto snapshot_start = Clock::now();
+      frame.state =
+          snapshot_(model_, data_);  // Short physics mutex hold; GPU render runs unlocked.
+      metrics.snapshot_ms =
+          std::chrono::duration<double, std::milli>(Clock::now() - snapshot_start).count();
+      bool completed = false;
+      if (frame.state.time != last_time) {
+        // The snapshot includes all poses computed by Engine::Step/Configure.
+        // Re-running mj_forward here repeats collision/constraint dynamics.
+        frame.capture_wall_time = WallTime();
+        const double capture_sim_time = frame.state.time;
+        if (capture_sim_time < last_time) publisher_.DiscardPending();
+        renderer.SetProjectileOpacity(projectile_opacity_.load());
+        completed =
+            renderer.RenderAsync(data_, std::move(frame), ready, shader_.load(), shadows_.load(),
+                                 exposure_.load(), bloom_.load(), lamp_intensity_.load(), metrics);
+        last_time = capture_sim_time;
+      } else {
+        // A paused simulation has no new capture, but its last GPU submissions
+        // must still reach the publisher. Polling does not duplicate an image.
+        completed = renderer.CollectReady(ready, metrics);
+      }
+      if (completed) {
+        ++frame_count;
+        ready.wall_fps = last_fps;
+        if (!publisher_.Submit(ready)) break;
+      }
+      const auto now = Clock::now();
+      const double elapsed = std::chrono::duration<double>(now - metric_start).count();
+      if (elapsed >= 1.0) {
+        last_fps = frame_count / elapsed;
+        metrics.capture_fps = last_fps;
+        const auto published = publisher_.Metrics();
+        std::cout << "[camera] capture " << last_fps << " FPS, published " << published.fps
+                  << " FPS, requested " << config_.camera_fps
+                  << ", publish " << published.publish_ms << " ms, queue drops "
+                  << published.dropped << '\n';
+        frame_count = 0;
+        metric_start = now;
+      }
+      const double cpu_wall = std::chrono::duration<double>(now - cpu_start).count();
+      if (cpu_wall >= .5) {
+        metrics.cpu_percent = 100.0 * (std::clock() - process_start) / (CLOCKS_PER_SEC * cpu_wall);
+        metrics.rss_mib = RssMiB();
+        cpu_start = now;
+        process_start = std::clock();
+      }
+      {
+        const std::lock_guard<std::mutex> lock(metrics_mutex_);
+        metrics_ = metrics;
+      }
+      deadline += period;
+      // Drop overdue captures instead of building a backlog of stale images.
+      if (deadline < Clock::now()) deadline = Clock::now();
+      std::this_thread::sleep_until(deadline);
     }
-} // namespace rm_auto_aim_sim
+  } catch (const std::exception& error) {
+    std::cerr << "[camera] " << error.what() << '\n';
+    failed_.store(true);
+  }
+  glfwMakeContextCurrent(nullptr);
+}
+}  // namespace rm_auto_aim_sim

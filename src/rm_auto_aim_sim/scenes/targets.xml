@@ -1,0 +1,41 @@
+<mujoco model="four_plate_target">
+  <worldbody>
+    <body name="target_center" mocap="true" pos="5 0 0">
+      <body name="target_rotor">
+        <joint name="target_spin" type="hinge" axis="0 0 1" limited="false" damping="0" />
+        <body name="armor_0" pos="0.6 0 .8">
+          <inertial pos="0 0 0" mass=".1" diaginertia=".0004 .0002 .0003" />
+          <geom name="armor_0_small_armor" type="mesh" mesh="target_small_armor" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_0_small_armor_target" type="mesh" mesh="target_small_armor_target" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_0_small_armor_light_bar" type="mesh" mesh="target_small_armor_light_bar" pos="0 0 -.0625" material="target_glow" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_0_number" type="mesh" mesh="target_small_num2_plane" pos=".014 0 0" quat=".5 .5 .5 .5" material="target_sticker" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_hitbox_0" type="box" pos=".004 0 0" size=".012 .0675 .0625" contype="1" conaffinity="2" group="3" rgba="0 0 0 0" solref=".002 1" friction=".3 .005 .0001" />
+        </body>
+        <body name="armor_1" pos="0 0.6 .8">
+          <inertial pos="0 0 0" mass=".1" diaginertia=".0004 .0002 .0003" />
+          <geom name="armor_1_small_armor" type="mesh" mesh="target_small_armor" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_1_small_armor_target" type="mesh" mesh="target_small_armor_target" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_1_small_armor_light_bar" type="mesh" mesh="target_small_armor_light_bar" pos="0 0 -.0625" material="target_glow" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_1_number" type="mesh" mesh="target_small_num2_plane" pos=".014 0 0" quat=".5 .5 .5 .5" material="target_sticker" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_hitbox_1" type="box" pos=".004 0 0" size=".012 .0675 .0625" contype="1" conaffinity="2" group="3" rgba="0 0 0 0" solref=".002 1" friction=".3 .005 .0001" />
+        </body>
+        <body name="armor_2" pos="-0.6 0 .8">
+          <inertial pos="0 0 0" mass=".1" diaginertia=".0004 .0002 .0003" />
+          <geom name="armor_2_small_armor" type="mesh" mesh="target_small_armor" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_2_small_armor_target" type="mesh" mesh="target_small_armor_target" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_2_small_armor_light_bar" type="mesh" mesh="target_small_armor_light_bar" pos="0 0 -.0625" material="target_glow" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_2_number" type="mesh" mesh="target_small_num2_plane" pos=".014 0 0" quat=".5 .5 .5 .5" material="target_sticker" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_hitbox_2" type="box" pos=".004 0 0" size=".012 .0675 .0625" contype="1" conaffinity="2" group="3" rgba="0 0 0 0" solref=".002 1" friction=".3 .005 .0001" />
+        </body>
+        <body name="armor_3" pos="0 -0.6 .8">
+          <inertial pos="0 0 0" mass=".1" diaginertia=".0004 .0002 .0003" />
+          <geom name="armor_3_small_armor" type="mesh" mesh="target_small_armor" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_3_small_armor_target" type="mesh" mesh="target_small_armor_target" pos="0 0 -.0625" material="target_black" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_3_small_armor_light_bar" type="mesh" mesh="target_small_armor_light_bar" pos="0 0 -.0625" material="target_glow" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_3_number" type="mesh" mesh="target_small_num2_plane" pos=".014 0 0" quat=".5 .5 .5 .5" material="target_sticker" contype="0" conaffinity="0" group="2" />
+          <geom name="armor_hitbox_3" type="box" pos=".004 0 0" size=".012 .0675 .0625" contype="1" conaffinity="2" group="3" rgba="0 0 0 0" solref=".002 1" friction=".3 .005 .0001" />
+        </body>
+      </body>
+    </body>
+  </worldbody>
+</mujoco>

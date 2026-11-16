@@ -1171,9 +1171,11 @@ void MakeUiSections(mj::Simulate* sim, const mjModel* m, const mjData* d) {
   MakeRenderingSection(sim, m);
   MakeVisualizationSection(sim, m);
   MakeGroupSection(sim);
-  MakeJointSection(sim);
-  MakeControlSection(sim);
-  MakeEqualitySection(sim);
+  if (!rm_auto_aim_sim::HasViewerEngine()) {
+    MakeJointSection(sim);
+    MakeControlSection(sim);
+    MakeEqualitySection(sim);
+  }
   rm_auto_aim_sim::AddViewerMenu(sim);
 }
 
@@ -1623,7 +1625,7 @@ void UiEvent(mjuiState* state) {
     // group section
     else if (it && it->sectionid==SECT_GROUP) {
       // remake joint section if joint group changed
-      if (it->name[0]=='J' && it->name[1]=='o') {
+      if (it->name[0]=='J' && it->name[1]=='o' && !rm_auto_aim_sim::HasViewerEngine()) {
         sim->ui1.nsect = SECT_JOINT;
         MakeJointSection(sim);
         sim->ui1.nsect = NSECT1;
@@ -1649,7 +1651,7 @@ void UiEvent(mjuiState* state) {
     // process UI event
     mjuiItem* it = mjui_event(&sim->ui1, state, &sim->platform_ui->mjr_context());
 
-    rm_auto_aim_sim::HandleViewerMenu(sim, it);
+    if (rm_auto_aim_sim::HandleViewerMenu(sim, it)) return;
 
     // control section
     if (it && it->sectionid==SECT_CONTROL) {
@@ -2579,14 +2581,14 @@ void Simulate::Render() {
   }
 
   if (pending_.ui_update_joint) {
-    if (this->ui1_enable && this->ui1.sect[SECT_JOINT].state) {
+    if (!rm_auto_aim_sim::HasViewerEngine() && this->ui1_enable && this->ui1.sect[SECT_JOINT].state) {
       mjui_update(SECT_JOINT, -1, &this->ui1, &this->uistate, &this->platform_ui->mjr_context());
     }
     pending_.ui_update_joint = false;
   }
 
   if (pending_.ui_remake_ctrl) {
-    if (this->ui1_enable && this->ui1.sect[SECT_CONTROL].state) {
+    if (!rm_auto_aim_sim::HasViewerEngine() && this->ui1_enable && this->ui1.sect[SECT_CONTROL].state) {
       this->ui1.nsect = SECT_CONTROL;
       MakeControlSection(this);
       this->ui1.nsect = NSECT1;
@@ -2596,21 +2598,23 @@ void Simulate::Render() {
   }
 
   if (pending_.ui_update_ctrl) {
-    if (this->ui1_enable && this->ui1.sect[SECT_CONTROL].state) {
+    if (!rm_auto_aim_sim::HasViewerEngine() && this->ui1_enable && this->ui1.sect[SECT_CONTROL].state) {
       mjui_update(SECT_CONTROL, -1, &this->ui1, &this->uistate, &this->platform_ui->mjr_context());
     }
     pending_.ui_update_ctrl = false;
   }
 
   if (pending_.ui_update_equality) {
-    if (this->ui1_enable && this->ui1.sect[SECT_EQUALITY].state) {
+    if (!rm_auto_aim_sim::HasViewerEngine() && this->ui1_enable && this->ui1.sect[SECT_EQUALITY].state) {
       mjui_update(SECT_EQUALITY, -1, &this->ui1, &this->uistate, &this->platform_ui->mjr_context());
     }
     pending_.ui_update_equality = false;
   }
 
   // render scene
+  rm_auto_aim_sim::ApplyViewerEnvironment(this);
   mjr_render(rect, &this->scn, &this->platform_ui->mjr_context());
+  rm_auto_aim_sim::DrawViewerPlots(this, rect);
 
   // show last loading error
   if (this->load_error[0]) {
@@ -2903,6 +2907,7 @@ void Simulate::RenderLoop() {
       fps_ = frames_ / interval;
       frames_ = 0;
     }
+    rm_auto_aim_sim::WaitForViewerFrame();
   }
 
   const MutexLock lock(this->mtx);

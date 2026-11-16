@@ -18,228 +18,242 @@
 #include <tf2_msgs/msg/tf_message.hpp>
 #include <thread>
 
-namespace rm_auto_aim_sim
-{
-    namespace
-    {
-        builtin_interfaces::msg::Time SimStamp(double seconds)
-        {
-            const auto nanoseconds = static_cast<std::int64_t>(std::llround(seconds * 1e9));
-            builtin_interfaces::msg::Time stamp;
-            stamp.sec = static_cast<std::int32_t>(nanoseconds / 1000000000LL);
-            stamp.nanosec = static_cast<std::uint32_t>(nanoseconds % 1000000000LL);
-            return stamp;
-        }
+namespace rm_auto_aim_sim {
+namespace {
+builtin_interfaces::msg::Time SimStamp(double seconds) {
+  const auto nanoseconds = static_cast<std::int64_t>(std::llround(seconds * 1e9));
+  builtin_interfaces::msg::Time stamp;
+  stamp.sec = static_cast<std::int32_t>(nanoseconds / 1000000000LL);
+  stamp.nanosec = static_cast<std::uint32_t>(nanoseconds % 1000000000LL);
+  return stamp;
+}
 
-        geometry_msgs::msg::TransformStamped Transform(const std::string& parent, const std::string& child,
-                                                       const Pose& parent_pose, const Pose& child_pose,
-                                                       double time)
-        {
-            geometry_msgs::msg::TransformStamped transform;
-            transform.header.stamp = SimStamp(time);
-            transform.header.frame_id = parent;
-            transform.child_frame_id = child;
-            mjtNum position[3], quaternion[4];
-            mju_sub3(position, child_pose.position.data(), parent_pose.position.data());
-            mjtNum inverse[4], rotated[3];
-            mju_negQuat(inverse, parent_pose.quaternion.data());
-            mju_rotVecQuat(rotated, position, inverse);
-            mju_mulQuat(quaternion, inverse, child_pose.quaternion.data());
-            auto& translation = transform.transform.translation;
-            translation.x = rotated[0];
-            translation.y = rotated[1];
-            translation.z = rotated[2];
-            auto& rotation = transform.transform.rotation;
-            rotation.w = quaternion[0];
-            rotation.x = quaternion[1];
-            rotation.y = quaternion[2];
-            rotation.z = quaternion[3];
-            return transform;
-        }
+geometry_msgs::msg::TransformStamped Transform(const std::string& parent, const std::string& child,
+                                               const Pose& parent_pose, const Pose& child_pose,
+                                               double time) {
+  geometry_msgs::msg::TransformStamped transform;
+  transform.header.stamp = SimStamp(time);
+  transform.header.frame_id = parent;
+  transform.child_frame_id = child;
+  mjtNum position[3], quaternion[4];
+  mju_sub3(position, child_pose.position.data(), parent_pose.position.data());
+  mjtNum inverse[4], rotated[3];
+  mju_negQuat(inverse, parent_pose.quaternion.data());
+  mju_rotVecQuat(rotated, position, inverse);
+  mju_mulQuat(quaternion, inverse, child_pose.quaternion.data());
+  auto& translation = transform.transform.translation;
+  translation.x = rotated[0];
+  translation.y = rotated[1];
+  translation.z = rotated[2];
+  auto& rotation = transform.transform.rotation;
+  rotation.w = quaternion[0];
+  rotation.x = quaternion[1];
+  rotation.y = quaternion[2];
+  rotation.z = quaternion[3];
+  return transform;
+}
 
-        std::string JsonString(const std::string& value)
-        {
-            std::ostringstream output;
-            output << '"';
-            for (const unsigned char ch : value)
-            {
-                if (ch == '"' || ch == '\\')
-                    output << '\\' << ch;
-                else if (ch < 32)
-                    output << "\\u" << std::hex << std::setw(4) << std::setfill('0') << int(ch) << std::dec;
-                else
-                    output << ch;
-            }
-            output << '"';
-            return output.str();
-        }
-    } // namespace
+std::string JsonString(const std::string& value) {
+  std::ostringstream output;
+  output << '"';
+  for (const unsigned char ch : value) {
+    if (ch == '"' || ch == '\\')
+      output << '\\' << ch;
+    else if (ch < 32)
+      output << "\\u" << std::hex << std::setw(4) << std::setfill('0') << int(ch) << std::dec;
+    else
+      output << ch;
+  }
+  output << '"';
+  return output.str();
+}
+}  // namespace
 
-    struct RosBridge::Impl
-    {
-        Config config;
-        rclcpp::Node::SharedPtr node;
-        rclcpp::executors::SingleThreadedExecutor executor;
-        std::thread executor_thread;
-        rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image;
-        rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info;
-        rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_states;
-        rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pitch, yaw, camera_fps;
-        rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr shot_count;
-        rclcpp::Publisher<std_msgs::msg::String>::SharedPtr hit_event;
-        rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clock;
-        rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr tf, tf_static;
-        rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_command, yaw_command;
-        rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr fire_command;
-    };
+struct RosBridge::Impl {
+  Config config;
+  rclcpp::Node::SharedPtr node;
+  rclcpp::executors::SingleThreadedExecutor executor;
+  std::thread executor_thread;
+  rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr image;
+  rclcpp::Publisher<sensor_msgs::msg::CameraInfo>::SharedPtr camera_info;
+  rclcpp::Publisher<sensor_msgs::msg::JointState>::SharedPtr joint_states;
+  rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr pitch, yaw, camera_fps, hit_rate;
+  rclcpp::Publisher<std_msgs::msg::UInt64>::SharedPtr shot_count, hit_count;
+  rclcpp::Publisher<std_msgs::msg::String>::SharedPtr hit_event, statistics;
+  rclcpp::Publisher<rosgraph_msgs::msg::Clock>::SharedPtr clock;
+  rclcpp::Publisher<tf2_msgs::msg::TFMessage>::SharedPtr tf, tf_static;
+  rclcpp::Subscription<std_msgs::msg::Float64>::SharedPtr pitch_command, yaw_command;
+  rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr fire_command;
+};
 
-    RosBridge::RosBridge(int argc, char** argv, Config& config)
-    {
-        rclcpp::init(argc, argv);
-        impl_ = std::make_unique<Impl>();
-        impl_->node = std::make_shared<rclcpp::Node>("rm_auto_aim_sim");
-        rcl_interfaces::msg::ParameterDescriptor descriptor;
-        descriptor.read_only = true;
-        descriptor.description = "Startup configuration; edit YAML and restart to change it.";
+RosBridge::RosBridge(int argc, char** argv, Config& config) {
+  rclcpp::init(argc, argv);
+  impl_ = std::make_unique<Impl>();
+  impl_->node = std::make_shared<rclcpp::Node>("rm_auto_aim_sim");
+  rcl_interfaces::msg::ParameterDescriptor descriptor;
+  descriptor.read_only = true;
+  descriptor.description = "Startup configuration; edit YAML and restart to change it.";
+  // Also accept legacy ROS parameter files/CLI overrides, rejecting ambiguity.
+  const auto& overrides = impl_->node->get_node_parameters_interface()->get_parameter_overrides();
+#define AIM_ALIAS(old_name, new_name) \
+  if (overrides.count(#old_name)) { \
+    if (overrides.count(#new_name)) throw std::runtime_error("Conflicting aliases: " #old_name " / " #new_name); \
+    config.new_name = impl_->node->declare_parameter<decltype(config.new_name)>(#old_name, config.new_name, descriptor); \
+  }
+#include "rm_auto_aim_sim/config_aliases.def"
+#undef AIM_ALIAS
 #define AIM_PARAMETER(type, name, value) \
   config.name = impl_->node->declare_parameter<type>(#name, config.name, descriptor);
 #include "rm_auto_aim_sim/config_fields.def"
 #undef AIM_PARAMETER
-        config.Validate();
-        impl_->config = config;
-        auto& node = impl_->node;
-        const auto sensor_qos = rclcpp::SensorDataQoS().keep_last(2);
-        impl_->image = node->create_publisher<sensor_msgs::msg::Image>(config.topic_image, sensor_qos);
-        impl_->camera_info =
-            node->create_publisher<sensor_msgs::msg::CameraInfo>(config.topic_camera_info, sensor_qos);
-        impl_->pitch = node->create_publisher<std_msgs::msg::Float64>(config.topic_pitch_state, 10);
-        impl_->yaw = node->create_publisher<std_msgs::msg::Float64>(config.topic_yaw_state, 10);
-        impl_->camera_fps = node->create_publisher<std_msgs::msg::Float64>(config.topic_camera_fps, 10);
-        impl_->joint_states =
-            node->create_publisher<sensor_msgs::msg::JointState>(config.topic_joint_states, 10);
-        impl_->shot_count = node->create_publisher<std_msgs::msg::UInt64>(config.topic_shot_count, 10);
-        impl_->hit_event = node->create_publisher<std_msgs::msg::String>(config.topic_hit_event, 20);
-        impl_->clock = node->create_publisher<rosgraph_msgs::msg::Clock>(config.topic_clock,
-                                                                         rclcpp::QoS(1).best_effort());
-        impl_->tf = node->create_publisher<tf2_msgs::msg::TFMessage>(config.topic_tf, rclcpp::QoS(100));
-        impl_->tf_static = node->create_publisher<tf2_msgs::msg::TFMessage>(
-            config.topic_tf_static, rclcpp::QoS(1).transient_local().reliable());
-    }
+  config.Validate();
+  impl_->config = config;
+  auto& node = impl_->node;
+  impl_->hit_count = node->create_publisher<std_msgs::msg::UInt64>(config.topic_hit_count, 10);
+  impl_->hit_rate = node->create_publisher<std_msgs::msg::Float64>(config.topic_hit_rate, 10);
+  impl_->statistics = node->create_publisher<std_msgs::msg::String>(config.topic_statistics, 10);
+  const auto sensor_qos = rclcpp::SensorDataQoS().keep_last(2);
+  impl_->image = node->create_publisher<sensor_msgs::msg::Image>(config.topic_image, sensor_qos);
+  impl_->camera_info =
+      node->create_publisher<sensor_msgs::msg::CameraInfo>(config.topic_camera_info, sensor_qos);
+  impl_->pitch = node->create_publisher<std_msgs::msg::Float64>(config.topic_pitch_state, 10);
+  impl_->yaw = node->create_publisher<std_msgs::msg::Float64>(config.topic_yaw_state, 10);
+  impl_->camera_fps = node->create_publisher<std_msgs::msg::Float64>(config.topic_camera_fps, 10);
+  impl_->joint_states =
+      node->create_publisher<sensor_msgs::msg::JointState>(config.topic_joint_states, 10);
+  impl_->shot_count = node->create_publisher<std_msgs::msg::UInt64>(config.topic_shot_count, 10);
+  impl_->hit_event = node->create_publisher<std_msgs::msg::String>(config.topic_hit_event, 20);
+  impl_->clock = node->create_publisher<rosgraph_msgs::msg::Clock>(config.topic_clock,
+                                                                   rclcpp::QoS(1).best_effort());
+  impl_->tf = node->create_publisher<tf2_msgs::msg::TFMessage>(config.topic_tf, rclcpp::QoS(100));
+  impl_->tf_static = node->create_publisher<tf2_msgs::msg::TFMessage>(
+      config.topic_tf_static, rclcpp::QoS(1).transient_local().reliable());
+}
 
-    void RosBridge::Attach(CommandMailbox& mailbox, const StateFrame& state)
-    {
-        auto& node = impl_->node;
-        const auto command_qos = rclcpp::QoS(1).reliable().durability_volatile();
-        impl_->pitch_command = node->create_subscription<std_msgs::msg::Float64>(
-            impl_->config.topic_pitch_command, command_qos,
-            [&mailbox](std_msgs::msg::Float64::ConstSharedPtr message)
-            {
-                mailbox.SetPitch(message->data);
-            });
-        impl_->yaw_command = node->create_subscription<std_msgs::msg::Float64>(
-            impl_->config.topic_yaw_command, command_qos,
-            [&mailbox](std_msgs::msg::Float64::ConstSharedPtr message)
-            {
-                mailbox.SetYaw(message->data);
-            });
-        impl_->fire_command = node->create_subscription<std_msgs::msg::Bool>(
-            impl_->config.topic_fire_command, command_qos,
-            [&mailbox](std_msgs::msg::Bool::ConstSharedPtr message) { mailbox.SetFire(message->data); });
-        const auto& config = impl_->config;
-        tf2_msgs::msg::TFMessage fixed;
-        fixed.transforms = {
-            Transform(config.frame_pitch, config.frame_camera, state.pitch_link,
-                      state.camera_link, state.time),
-            Transform(config.frame_camera, config.frame_camera_optical, state.camera_link,
-                      state.optical, state.time),
-            Transform(config.frame_pitch, config.frame_muzzle, state.pitch_link,
-                      state.muzzle, state.time)
-        };
-        impl_->tf_static->publish(fixed);
-        impl_->executor.add_node(node);
-        impl_->executor_thread = std::thread([this]() { impl_->executor.spin(); });
-    }
+void RosBridge::Attach(CommandMailbox& mailbox, const StateFrame& state) {
+  auto& node = impl_->node;
+  const auto command_qos = rclcpp::QoS(1).reliable().durability_volatile();
+  impl_->pitch_command = node->create_subscription<std_msgs::msg::Float64>(
+      impl_->config.topic_pitch_command, command_qos,
+      [&mailbox](std_msgs::msg::Float64::ConstSharedPtr message) {
+        mailbox.SetPitch(message->data);
+      });
+  impl_->yaw_command = node->create_subscription<std_msgs::msg::Float64>(
+      impl_->config.topic_yaw_command, command_qos,
+      [&mailbox](std_msgs::msg::Float64::ConstSharedPtr message) {
+        mailbox.SetYaw(message->data);
+      });
+  impl_->fire_command = node->create_subscription<std_msgs::msg::Bool>(
+      impl_->config.topic_fire_command, command_qos,
+      [&mailbox](std_msgs::msg::Bool::ConstSharedPtr message) { mailbox.SetFire(message->data); });
+  const auto& config = impl_->config;
+  tf2_msgs::msg::TFMessage fixed;
+  fixed.transforms = {Transform(config.frame_pitch, config.frame_camera, state.pitch_link,
+                                state.camera_link, state.time),
+                      Transform(config.frame_camera, config.frame_camera_optical, state.camera_link,
+                                state.optical, state.time),
+                      Transform(config.frame_pitch, config.frame_muzzle, state.pitch_link,
+                                state.muzzle, state.time)};
+  impl_->tf_static->publish(fixed);
+  impl_->executor.add_node(node);
+  impl_->executor_thread = std::thread([this]() { impl_->executor.spin(); });
+}
 
-    RosBridge::~RosBridge()
-    {
-        impl_->executor.cancel();
-        if (impl_->executor_thread.joinable()) impl_->executor_thread.join();
-        if (rclcpp::ok()) rclcpp::shutdown();
-    }
+RosBridge::~RosBridge() {
+  impl_->executor.cancel();
+  if (impl_->executor_thread.joinable()) impl_->executor_thread.join();
+  if (rclcpp::ok()) rclcpp::shutdown();
+}
 
-    bool RosBridge::Running() const { return rclcpp::ok(); }
+bool RosBridge::Running() const { return rclcpp::ok(); }
 
-    void RosBridge::PublishState(const StateFrame& state, const std::vector<HitEvent>& hits)
-    {
-        const auto& config = impl_->config;
-        const auto stamp = SimStamp(state.time);
-        rosgraph_msgs::msg::Clock clock;
-        clock.clock = stamp;
-        impl_->clock->publish(clock);
-        tf2_msgs::msg::TFMessage dynamic;
-        const Pose world;
-        dynamic.transforms = {
-            Transform(config.frame_world, config.frame_base, world, state.base, state.time),
-            Transform(config.frame_base, config.frame_yaw, state.base, state.yaw_link, state.time),
-            Transform(config.frame_yaw, config.frame_pitch, state.yaw_link, state.pitch_link,
-                      state.time)
-        };
-        impl_->tf->publish(dynamic);
-        std_msgs::msg::Float64 angle;
-        angle.data = state.pitch;
-        impl_->pitch->publish(angle);
-        angle.data = state.yaw;
-        impl_->yaw->publish(angle);
-        sensor_msgs::msg::JointState joints;
-        joints.header.stamp = stamp;
-        joints.header.frame_id = config.frame_base;
-        joints.name = {config.model_yaw_joint, config.model_pitch_joint};
-        joints.position = {state.yaw, state.pitch};
-        joints.velocity = {state.yaw_velocity, state.pitch_velocity};
-        impl_->joint_states->publish(joints);
-        std_msgs::msg::UInt64 shots;
-        shots.data = state.shot_count;
-        impl_->shot_count->publish(shots);
-        for (const auto& hit : hits)
-        {
-            std::ostringstream json;
-            json << std::setprecision(12) << "{\"shot_id\":" << hit.shot_id << ",\"sim_time\":" << hit.time
-                << ",\"geom\":" << JsonString(hit.geom_name) << ",\"position\":[" << hit.position[0] << ','
-                << hit.position[1] << ',' << hit.position[2] << "]}";
-            std_msgs::msg::String message;
-            message.data = json.str();
-            impl_->hit_event->publish(message);
-        }
-    }
+void RosBridge::PublishState(const StateFrame& state, const std::vector<HitEvent>& hits) {
+  const auto& config = impl_->config;
+  const auto stamp = SimStamp(state.time);
+  rosgraph_msgs::msg::Clock clock;
+  clock.clock = stamp;
+  impl_->clock->publish(clock);
+  tf2_msgs::msg::TFMessage dynamic;
+  const Pose world;
+  dynamic.transforms = {
+      Transform(config.frame_world, config.frame_base, world, state.base, state.time),
+      Transform(config.frame_base, config.frame_yaw, state.base, state.yaw_link, state.time),
+      Transform(config.frame_yaw, config.frame_pitch, state.yaw_link, state.pitch_link,
+                state.time)};
+  impl_->tf->publish(dynamic);
+  std_msgs::msg::Float64 angle;
+  angle.data = state.pitch;
+  impl_->pitch->publish(angle);
+  angle.data = state.yaw;
+  impl_->yaw->publish(angle);
+  sensor_msgs::msg::JointState joints;
+  joints.header.stamp = stamp;
+  joints.header.frame_id = config.frame_base;
+  joints.name = {config.model_yaw_joint, config.model_pitch_joint};
+  joints.position = {state.yaw, state.pitch};
+  joints.velocity = {state.yaw_velocity, state.pitch_velocity};
+  impl_->joint_states->publish(joints);
+  std_msgs::msg::UInt64 shots;
+  shots.data = state.shot_count;
+  impl_->shot_count->publish(shots);
+  shots.data = state.armor_hits;
+  impl_->hit_count->publish(shots);
+  angle.data = state.hit_rate;
+  impl_->hit_rate->publish(angle);
+  std::ostringstream totals;
+  totals << "{\"epoch\":" << state.statistics_epoch << ",\"shots\":" << state.statistics_shots
+         << ",\"hits\":" << state.armor_hits << ",\"hit_rate\":" << state.hit_rate
+         << ",\"plate_hits\":[" << state.plate_hits[0] << ',' << state.plate_hits[1] << ','
+         << state.plate_hits[2] << ',' << state.plate_hits[3]
+         << "],\"outpost_plate_hits\":[" << state.outpost_plate_hits[0] << ','
+         << state.outpost_plate_hits[1] << ',' << state.outpost_plate_hits[2] << "]}";
+  std_msgs::msg::String statistics;
+  statistics.data = totals.str();
+  impl_->statistics->publish(statistics);
+  for (const auto& hit : hits) {
+    std::ostringstream json;
+    json << std::setprecision(12) << "{\"shot_id\":" << hit.shot_id << ",\"sim_time\":" << hit.time
+         << ",\"armor_hit\":" << (hit.armor_hit ? "true" : "false")
+         << ",\"target_type\":" << JsonString(hit.target_type)
+         << ",\"armor_index\":" << hit.armor_index << ",\"geom\":" << JsonString(hit.geom_name)
+         << ",\"position\":[" << hit.position[0] << ',' << hit.position[1] << ',' << hit.position[2]
+         << "]}";
+    std_msgs::msg::String message;
+    message.data = json.str();
+    impl_->hit_event->publish(message);
+  }
+}
 
-    void RosBridge::PublishCamera(const CameraFrame& frame)
-    {
-        const auto& config = impl_->config;
-        sensor_msgs::msg::Image image;
-        image.header.stamp = SimStamp(frame.state.time);
-        image.header.frame_id = config.frame_camera_optical;
-        image.width = frame.width;
-        image.height = frame.height;
-        image.encoding = "rgb8";
-        image.is_bigendian = false;
-        image.step = frame.width * 3;
-        image.data = frame.rgb;
-        sensor_msgs::msg::CameraInfo info;
-        info.header = image.header;
-        info.width = frame.width;
-        info.height = frame.height;
-        info.distortion_model = "plumb_bob";
-        info.d = {0, 0, 0, 0, 0};
-        const double focal = frame.focal_length;
-        const double cx = (frame.width - 1) * 0.5;
-        const double cy = (frame.height - 1) * 0.5;
-        info.k = {focal, 0, cx, 0, focal, cy, 0, 0, 1};
-        info.r = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-        info.p = {focal, 0, cx, 0, 0, focal, cy, 0, 0, 0, 1, 0};
-        impl_->camera_info->publish(info);
-        impl_->image->publish(image);
-        std_msgs::msg::Float64 fps;
-        fps.data = frame.wall_fps;
-        impl_->camera_fps->publish(fps);
-    }
-} // namespace rm_auto_aim_sim
+void RosBridge::PublishCamera(CameraFrame&& frame) {
+  const auto& config = impl_->config;
+  sensor_msgs::msg::Image image;
+  image.header.stamp = SimStamp(frame.state.time);
+  image.header.frame_id = config.frame_camera_optical;
+  image.width = frame.width;
+  image.height = frame.height;
+  image.encoding = "rgb8";
+  image.is_bigendian = false;
+  image.step = frame.width * 3;
+  image.data = std::move(frame.rgb);
+  sensor_msgs::msg::CameraInfo info;
+  info.header = image.header;
+  info.width = frame.width;
+  info.height = frame.height;
+  info.distortion_model = "plumb_bob";
+  info.d = {0, 0, 0, 0, 0};
+  const double fx = frame.fx, fy = frame.fy;
+  const double cx = frame.cx;
+  const double cy = frame.cy;
+  info.k = {fx, 0, cx, 0, fy, cy, 0, 0, 1};
+  info.r = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+  info.p = {fx, 0, cx, 0, 0, fy, cy, 0, 0, 0, 1, 0};
+  impl_->camera_info->publish(info);
+  impl_->image->publish(image);
+  // rclcpp's const-reference publish has returned; reclaim the RGB allocation
+  // instead of freeing and zero-allocating a multi-megabyte vector every frame.
+  frame.rgb = std::move(image.data);
+  std_msgs::msg::Float64 fps;
+  fps.data = frame.wall_fps;
+  impl_->camera_fps->publish(fps);
+}
+}  // namespace rm_auto_aim_sim

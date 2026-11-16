@@ -4,3 +4,10 @@
 __pycache__/
 *.ppm
 *.png
+
+# Local RMUC assets (official derived assets are not redistributed)
+/assets/
+*.before_init_fix
+
+!src/rm_auto_aim_sim/scenes/armor/*.png
+!src/rm_auto_aim_sim/docs/images/*.png
