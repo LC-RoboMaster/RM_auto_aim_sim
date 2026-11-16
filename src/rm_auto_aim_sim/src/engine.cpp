@@ -21,14 +21,10 @@ mjModel* CompileModel(const Config& config) {
   if (!spec) throw std::runtime_error(error);
   auto* world = mjs_findBody(spec.get(), "world");
   if (!world) throw std::runtime_error("Model has no world body");
-  if (!config.armor_enabled) {
-    if (auto* target = mjs_findBody(spec.get(), "target_center"))
-      mjs_delete(spec.get(), target->element);
-  }
-  if (!config.outpost_enabled) {
-    if (auto* outpost = mjs_findBody(spec.get(), "outpost_center"))
-      mjs_delete(spec.get(), outpost->element);
-  }
+  // Both target modules are always compiled into the model, even when the YAML switches
+  // are off. armour_enabled / outpost_enabled now only choose the initial state; the
+  // viewer can switch either module on or off while running (see ArmorTarget::SetEnabled).
+  // Keeping the topology fixed means no model rebuild is needed to toggle them.
   // Attach exported upstream field with a prefix, avoiding robot asset/name conflicts.
   std::unique_ptr<mjSpec, decltype(&mj_deleteSpec)> field(nullptr, mj_deleteSpec);
   if (!config.field_xml.empty()) {
@@ -187,8 +183,16 @@ Engine::Engine(Config config) : config_(std::move(config)) {
     yaw_dof_ = model_->jnt_dofadr[yaw_joint];
     pitch_dof_ = model_->jnt_dofadr[pitch_joint];
     pool_ = std::make_unique<ProjectilePool>(config_, model_);
-    if (config_.armor_enabled) target_ = std::make_unique<ArmorTarget>(config_, model_);
-    if (config_.outpost_enabled) outpost_ = std::make_unique<ArmorTarget>(config_, model_, true);
+    // Create every module the scene actually contains, then apply the YAML switch as the
+    // initial on/off state. This is what makes runtime toggling possible without a rebuild.
+    if (mj_name2id(model_, mjOBJ_BODY, "target_center") >= 0) {
+      target_ = std::make_unique<ArmorTarget>(config_, model_);
+      target_->SetEnabled(config_.armor_enabled, data_);
+    }
+    if (mj_name2id(model_, mjOBJ_BODY, "outpost_center") >= 0) {
+      outpost_ = std::make_unique<ArmorTarget>(config_, model_, true);
+      outpost_->SetEnabled(config_.outpost_enabled, data_);
+    }
     yaw_continuous_ = config_.yaw_continuous;
     original_diffuse_.assign(model_->light_diffuse, model_->light_diffuse + 3 * model_->nlight);
     original_ambient_.assign(model_->light_ambient, model_->light_ambient + 3 * model_->nlight);

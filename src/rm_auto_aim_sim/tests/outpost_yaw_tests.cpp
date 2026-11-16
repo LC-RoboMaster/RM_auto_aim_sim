@@ -122,7 +122,21 @@ int main(int argc, char** argv) {
     Check(Near(engine.State().yaw, 0), "Yaw reset failed");
     config.armor_enabled = false; config.outpost_enabled = false;
     aim::Engine neither(config);
-    Check(!neither.Target() && !neither.Outpost(), "Disabled target modules were compiled");
+    Check(neither.Target() && neither.Outpost() && !neither.Target()->Enabled() &&
+              !neither.Outpost()->Enabled(),
+          "Switched-off modules must still be compiled, but start inactive");
+    // An inactive module is parked far outside the arena instead of being deleted, so the
+    // viewer can switch it back on without rebuilding the model.
+    const int parked = mj_name2id(neither.Model(), mjOBJ_BODY, "armor_0");
+    Check(parked >= 0 && std::abs(neither.Data()->xpos[3 * parked]) > 500,
+          "Inactive module was not parked outside the arena");
+    neither.Target()->SetEnabled(true, neither.Data());
+    neither.Outpost()->SetEnabled(true, neither.Data());
+    mj_forward(neither.Model(), neither.Data());
+    // armor_0 sits on the first plate radius, so only require it to be back near the
+    // configured centre instead of the parked 1000 m parking slot.
+    Check(std::abs(neither.Data()->xpos[3 * parked] - neither.Target()->Settings().center[0]) < 10,
+          "Re-enabling a module failed to bring it back into the arena");
     std::cout << "PASS: outpost mechanics, outward/down digits, independent spin/materials, snapshot/reset/hits, "
                  "AUTO shortest paths, manual multiple turns, wrapped feedback, hard-stop fallback.\n";
     return 0;

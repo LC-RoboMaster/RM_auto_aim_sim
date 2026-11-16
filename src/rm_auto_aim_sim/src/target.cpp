@@ -108,14 +108,33 @@ void ArmorTarget::ApplyLampMaterial() {
 }
 
 void ArmorTarget::Apply(mjData* data) const {
-  std::copy(settings_.center.begin(), settings_.center.end(), data->mocap_pos + 3 * center_mocap_);
+  auto* center = data->mocap_pos + 3 * center_mocap_;
+  if (!enabled_) {
+    // Park far outside the arena: invisible in the viewer and in the rendered camera
+    // image, and far beyond any projectile's reach, so it cannot collect hits.
+    center[0] = 1000.0;
+    center[1] = 1000.0 + 10.0 * center_mocap_;
+    center[2] = -1000.0;
+    data->qpos[qpos_] = settings_.angle;
+    data->qvel[dof_] = 0;
+    return;
+  }
+  std::copy(settings_.center.begin(), settings_.center.end(), center);
   data->qpos[qpos_] = settings_.angle;
   data->qvel[dof_] = settings_.angular_speed;
 }
 
 void ArmorTarget::Advance(double dt, mjData* data) {
+  if (!enabled_) return;
   settings_.angle = std::remainder(settings_.angle + dt * settings_.angular_speed, 2 * mjPI);
   Apply(data);
+}
+
+void ArmorTarget::SetEnabled(bool enabled, mjData* data) {
+  if (enabled_ == enabled) return;
+  enabled_ = enabled;
+  Apply(data);
+  mj_forward(model_, data);
 }
 
 void ArmorTarget::Reset(mjData* data) { Configure(initial_, data); }

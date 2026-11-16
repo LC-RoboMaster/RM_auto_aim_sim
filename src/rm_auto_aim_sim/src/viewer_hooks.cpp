@@ -23,6 +23,10 @@ int mode_ui = 0, view_ui = 0, direction_ui = 0, plots_ui = 1;
 int control_section = -1, target_section = -1, camera_section = -1, stats_section = -1;
 int performance_section = -1, performance_plots_ui = 0;
 TargetSettings target_ui, outpost_ui;
+// Runtime module switches (checkboxes at the bottom of the ARMOR / OUTPOST panels).
+int target_enabled_ui = 1, outpost_enabled_ui = 0;
+constexpr int kTargetEnabledItem = 13;   // item index of "Enabled" inside ARMOR
+constexpr int kOutpostEnabledItem = 13;  // item index of "Enabled" inside OUTPOST
 int outpost_section = -1, outpost_direction_ui = 0, yaw_continuous_ui = 1;
 double outpost_speed_ui = 0, outpost_diameter_ui = .55, outpost_plane_ui = 75;
 double armor_tilt_ui = 15;
@@ -168,6 +172,8 @@ void AddViewerMenu(mujoco::Simulate* sim) {
     mjv_defaultFreeCamera(engine->Model(), &saved_free_camera);
   if (engine->Target()) target_ui = engine->Target()->Settings();
   if (engine->Outpost()) outpost_ui = engine->Outpost()->Settings();
+  target_enabled_ui = engine->Target() && engine->Target()->Enabled() ? 1 : 0;
+  outpost_enabled_ui = engine->Outpost() && engine->Outpost()->Enabled() ? 1 : 0;
   outpost_diameter_ui = 2 * outpost_ui.r1;
   outpost_plane_ui = 90 + outpost_ui.tilt * 180 / mjPI;
   outpost_speed_ui = std::abs(outpost_ui.angular_speed);
@@ -238,6 +244,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SLIDERNUM, "Normal up [deg]", 1, &armor_tilt_ui, "-60 60"},
       {mjITEM_SLIDERNUM, "LED white mix", 1, &lamp_white_ui, "0 1"},
       {mjITEM_EDITNUM, "Heading [rad]", 1, &target_ui.angle, "1"},
+      {mjITEM_CHECKINT, "Enabled", 1, &target_enabled_ui},
       {mjITEM_SECTION, "OUTPOST (3 PLATES)", 1},
       {mjITEM_EDITNUM, "Center XYZ [m]", 1, outpost_ui.center.data(), "3"},
       {mjITEM_SLIDERNUM, "Diameter [m]", 1, &outpost_diameter_ui, "0.16 10"},
@@ -252,6 +259,7 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_SLIDERNUM, "LED white mix", 1, &outpost_ui.light_whiteness, "0 1"},
       {mjITEM_EDITNUM, "Heading [rad]", 1, &outpost_ui.angle, "1"},
       {mjITEM_STATIC, "Geometry", 1, nullptr, "120 deg spacing\nPlate centre heights\nNormal faces out/down"},
+      {mjITEM_CHECKINT, "Enabled", 1, &outpost_enabled_ui},
       {mjITEM_SECTION, "CAMERA / LIGHT", 0},
       {mjITEM_EDITNUM, "fx / fy [px]", 1, &camera_ui.fx, "2 1 100000 1 100000"},
       {mjITEM_EDITNUM, "cx / cy [px]", 1, &camera_ui.cx, "2"},
@@ -284,7 +292,8 @@ void AddViewerMenu(mujoco::Simulate* sim) {
       {mjITEM_CHECKINT, "Show perf plots", 1, &performance_plots_ui},
       {mjITEM_END}};
   mjui_add(&sim->ui1, definition);
-  // Enabling a module changes topology and requires restart; disable absent controls.
+  // Both modules are compiled in and toggled live from their panels. Only a scene that
+  // does not contain the corresponding bodies has nothing to control, so grey it out.
   for (int section : {target_section, outpost_section}) {
     if ((section == target_section && engine->Target()) ||
         (section == outpost_section && engine->Outpost())) continue;
@@ -311,6 +320,8 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
       if (item->itemid == 1) ChangeView(sim);
       if (item->itemid == 4) engine->SetYawContinuous(yaw_continuous_ui != 0);
     } else if (item->sectionid == target_section && engine->Target()) {
+      if (item->itemid == kTargetEnabledItem)
+        engine->Target()->SetEnabled(target_enabled_ui != 0, engine->Data());
       if (item->itemid != 12)
         target_ui.angle = item->itemid == 8 ? 0 : engine->Target()->Settings().angle;
       target_ui.tilt = armor_tilt_ui * mjPI / 180;
@@ -320,6 +331,8 @@ bool HandleViewerMenu(mujoco::Simulate* sim, const mjuiItem* item) {
       std::snprintf(sim->ui1.sect[target_section].item[9].multi.name[2], mjMAXUINAME,
                     "Normal up %.1f deg", armor_tilt_ui);
     } else if (item->sectionid == outpost_section && engine->Outpost()) {
+      if (item->itemid == kOutpostEnabledItem)
+        engine->Outpost()->SetEnabled(outpost_enabled_ui != 0, engine->Data());
       if (item->itemid != 11)
         outpost_ui.angle = item->itemid == 9 ? 0 : engine->Outpost()->Settings().angle;
       outpost_ui.r1 = outpost_ui.r2 = outpost_diameter_ui / 2;

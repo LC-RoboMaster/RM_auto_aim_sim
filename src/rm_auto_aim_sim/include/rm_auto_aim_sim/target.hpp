@@ -27,9 +27,15 @@ class ArmorTarget {
   void Advance(double dt, mjData* data);
   void Reset(mjData* data);
   void SetLightWhiteness(double whiteness);
+  // Runtime module switch. A disabled module is parked far outside the arena, so it is
+  // invisible to both the viewer and the camera and no projectile can collide with it.
+  // Its pose settings survive, so enabling it again restores the previous state.
+  bool Enabled() const { return enabled_; }
+  void SetEnabled(bool enabled, mjData* data);
 
  private:
   void ApplyLampMaterial();
+  bool enabled_ = true;
   bool outpost_ = false;
   int plate_count_ = 4;
   mjModel* model_;
